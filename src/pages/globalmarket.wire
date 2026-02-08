@@ -1,0 +1,446 @@
+import json
+from src.financial_data import get_inflation_data
+from src.worldbank_data import get_country_stock_returns, get_available_countries, DEFAULT_COUNTRIES
+
+# Fetch inflation data
+inflation_data = get_inflation_data(years=20)
+
+# Get all available countries
+all_countries = get_available_countries()
+
+# Fetch stock market data for all countries that have data
+countries_data = {}
+all_dates_sets = [set(inflation_data['dates'])]
+
+for country in all_countries:
+    try:
+        country_data = get_country_stock_returns(country, years=20)
+        if country_data and country_data['dates']:
+            countries_data[country] = country_data
+            all_dates_sets.append(set(country_data['dates']))
+    except Exception as e:
+        pass
+
+# Don't filter - use all available data for each country
+# Each country will show data for its own date range
+filtered_countries_data = countries_data
+
+# Prepare JSON strings for JavaScript
+inflation_json = json.dumps(inflation_data)
+countries_json = json.dumps(filtered_countries_data)
+
+--- html ---
+
+<div id="chart-data" style="display: none;"
+     data-inflation='{inflation_json}'
+     data-countries='{countries_json}'>
+</div>
+
+<section>
+    <h1>Global Stock Market Performance</h1>
+    <p>Growth of $1 invested in stock markets worldwide over the past 20 years (World Bank data). Hover over countries in the legend to highlight them on the chart.</p>
+
+    <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+        <button id="showAllButton" style="
+            padding: 8px 16px;
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+            color: #333;
+            border: 1px solid #999;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        " onmouseover="this.style.background='linear-gradient(to bottom, #f8f8f8, #e8e8e8)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.15)'"
+           onmouseout="this.style.background='linear-gradient(to bottom, #ffffff, #f0f0f0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)'">Show All</button>
+        <button id="hideAllButton" style="
+            padding: 8px 16px;
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+            color: #333;
+            border: 1px solid #999;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        " onmouseover="this.style.background='linear-gradient(to bottom, #f8f8f8, #e8e8e8)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.15)'"
+           onmouseout="this.style.background='linear-gradient(to bottom, #ffffff, #f0f0f0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)'">Hide All Countries</button>
+        <button id="showMajorButton" style="
+            padding: 8px 16px;
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+            color: #333;
+            border: 1px solid #999;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        " onmouseover="this.style.background='linear-gradient(to bottom, #f8f8f8, #e8e8e8)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.15)'"
+           onmouseout="this.style.background='linear-gradient(to bottom, #ffffff, #f0f0f0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)'">Show Major Countries</button>
+    </div>
+
+    <div style="margin-bottom: 3rem;">
+        <h2>Compounded Growth Across <span id="countryCount">{len(filtered_countries_data)}</span> Countries</h2>
+        <div style="position: relative; height: 600px;">
+            <canvas id="combinedChart"></canvas>
+        </div>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    window.addEventListener('load', function() {
+        // Parse data from Python
+        const chartDataEl = document.getElementById('chart-data');
+        const inflationData = JSON.parse(chartDataEl.dataset.inflation);
+        const countriesData = JSON.parse(chartDataEl.dataset.countries);
+
+        // Collect all unique dates from all countries
+        const allDatesSet = new Set(inflationData.dates || []);
+        Object.values(countriesData).forEach(country => {
+            (country.dates || []).forEach(date => allDatesSet.add(date));
+        });
+        const allDates = Array.from(allDatesSet).sort((a, b) => a - b);
+
+        // Generate colors for each country
+        function generateColor(index, total) {
+            const hue = (index * 360 / total) % 360;
+            return `hsl(${hue}, 70%, 50%)`;
+        }
+
+        // Convert country data to chart.js format (sparse data)
+        function createDataPoints(dates, values) {
+            const dataMap = {};
+            (dates || []).forEach((date, i) => {
+                dataMap[date] = values[i];
+            });
+            return allDates.map(date => dataMap[date] !== undefined ? dataMap[date] : null);
+        }
+
+        // Detect user's country from browser locale
+        function getUserCountry() {
+            const locale = navigator.language || navigator.userLanguage || '';
+            const countryCode = locale.split('-')[1]?.toUpperCase();
+
+            // Map country codes to World Bank country names
+            const countryMap = {
+                'US': 'United States',
+                'GB': 'United Kingdom',
+                'UK': 'United Kingdom',
+                'CA': 'Canada',
+                'AU': 'Australia',
+                'DE': 'Germany',
+                'FR': 'France',
+                'IT': 'Italy',
+                'ES': 'Spain',
+                'JP': 'Japan',
+                'CN': 'China',
+                'IN': 'India',
+                'BR': 'Brazil',
+                'MX': 'Mexico',
+                'KR': 'South Korea',
+                'NL': 'Netherlands',
+                'CH': 'Switzerland',
+                'SE': 'Sweden',
+                'NO': 'Norway',
+                'DK': 'Denmark',
+                'FI': 'Finland',
+                'PL': 'Poland',
+                'BE': 'Belgium',
+                'AT': 'Austria',
+                'NZ': 'New Zealand',
+                'SG': 'Singapore',
+                'HK': 'Hong Kong SAR, China',
+                'IE': 'Ireland',
+                'PT': 'Portugal',
+                'GR': 'Greece',
+                'CZ': 'Czech Republic',
+                'IL': 'Israel',
+                'AR': 'Argentina',
+                'CL': 'Chile',
+                'CO': 'Colombia',
+                'TH': 'Thailand',
+                'MY': 'Malaysia',
+                'PH': 'Philippines',
+                'ID': 'Indonesia',
+                'ZA': 'South Africa',
+                'TR': 'Turkey',
+                'SA': 'Saudi Arabia',
+                'AE': 'United Arab Emirates',
+                'EG': 'Egypt, Arab Rep.',
+                'RU': 'Russian Federation'
+            };
+
+            return countryMap[countryCode] || null;
+        }
+
+        const userCountry = getUserCountry();
+
+        // Create datasets for all countries
+        const datasets = [];
+        let countryNames = Object.keys(countriesData);
+
+        // Sort countries so user's country appears first in legend
+        if (userCountry && countryNames.includes(userCountry)) {
+            countryNames = [userCountry, ...countryNames.filter(c => c !== userCountry)];
+        }
+
+        countryNames.forEach((country, index) => {
+            const color = generateColor(index, countryNames.length);
+            const countryData = countriesData[country];
+            const borderWidth = 1.5;
+
+            datasets.push({
+                label: country,
+                data: createDataPoints(countryData.dates, countryData.values),
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: borderWidth,
+                originalBorderWidth: borderWidth, // Store original for restoration
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                hidden: false,
+                spanGaps: true
+            });
+        });
+
+        // Calculate global average across all countries (permanent, doesn't change with filtering)
+        function calculateGlobalAverage(datasetsToAverage) {
+            const averageData = allDates.map((date, dateIndex) => {
+                const values = [];
+                datasetsToAverage.forEach(dataset => {
+                    const value = dataset.data[dateIndex];
+                    if (value !== null && value !== undefined) {
+                        values.push(value);
+                    }
+                });
+                if (values.length === 0) return null;
+                return values.reduce((sum, val) => sum + val, 0) / values.length;
+            });
+            return averageData;
+        }
+
+        // Calculate global average using ALL countries (before adding special lines)
+        const globalAverageData = calculateGlobalAverage(datasets);
+
+        // Add global average as a highlighted line
+        const globalAverageBorderWidth = 3;
+        datasets.push({
+            label: 'Global Average',
+            data: globalAverageData,
+            borderColor: 'rgb(0, 128, 0)',
+            backgroundColor: 'rgba(0, 128, 0, 0.1)',
+            borderWidth: globalAverageBorderWidth,
+            originalBorderWidth: globalAverageBorderWidth,
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            borderDash: [5, 5],
+            spanGaps: true
+        });
+
+        // Add inflation as a special highlighted line
+        const inflationBorderWidth = 3;
+        datasets.push({
+            label: 'US Inflation (Cost of Living)',
+            data: createDataPoints(inflationData.dates, inflationData.values),
+            borderColor: 'rgb(255, 0, 0)',
+            backgroundColor: 'rgba(255, 0, 0, 0.1)',
+            borderWidth: inflationBorderWidth,
+            originalBorderWidth: inflationBorderWidth,
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            borderDash: [10, 5],
+            spanGaps: true
+        });
+
+        // Major countries list
+        const majorCountries = [
+            'United States', 'China', 'United Kingdom', 'Germany', 'Japan',
+            'Canada', 'France', 'India', 'Australia', 'Brazil',
+            'Italy', 'Spain', 'South Korea', 'Netherlands', 'Switzerland'
+        ];
+
+        // Combined Chart
+        const ctx = document.getElementById('combinedChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'nearest',
+                    intersect: false,
+                    axis: 'xy'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            font: {
+                                size: 10
+                            }
+                        },
+                        onHover: function(event, legendItem, legend) {
+                            const chart = legend.chart;
+                            const datasetIndex = legendItem.datasetIndex;
+                            const dataset = chart.data.datasets[datasetIndex];
+
+                            // Don't show tooltip or effects for hidden datasets
+                            if (!chart.isDatasetVisible(datasetIndex)) {
+                                return;
+                            }
+
+                            // Highlight the hovered dataset and dim others
+                            chart.data.datasets.forEach((ds, index) => {
+                                if (index === datasetIndex) {
+                                    // Glow effect: increase border width based on original
+                                    ds.borderWidth = ds.originalBorderWidth + 2.5;
+                                    ds.backgroundColor = ds.borderColor + 'AA'; // More opaque
+                                } else {
+                                    // Dim other datasets
+                                    ds.backgroundColor = ds.borderColor + '10'; // Very transparent
+                                }
+                            });
+                            chart.update('none'); // Update without animation
+
+                            // Find the last non-null data point index
+                            let lastDataIndex = -1;
+                            for (let i = dataset.data.length - 1; i >= 0; i--) {
+                                if (dataset.data[i] !== null && dataset.data[i] !== undefined) {
+                                    lastDataIndex = i;
+                                    break;
+                                }
+                            }
+
+                            // Show tooltip at the last data point
+                            if (lastDataIndex >= 0) {
+                                chart.tooltip.setActiveElements([{
+                                    datasetIndex: datasetIndex,
+                                    index: lastDataIndex
+                                }]);
+                                chart.update('none');
+                            }
+                        },
+                        onLeave: function(event, legendItem, legend) {
+                            const chart = legend.chart;
+
+                            // Reset all datasets to original styling
+                            chart.data.datasets.forEach((dataset) => {
+                                // Reset border width from stored original
+                                dataset.borderWidth = dataset.originalBorderWidth;
+                                // Reset background color
+                                dataset.backgroundColor = dataset.borderColor + '20';
+                            });
+
+                            // Hide tooltip
+                            chart.tooltip.setActiveElements([]);
+                            chart.update('none'); // Update without animation
+                        }
+                    },
+                    title: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': $';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y.toFixed(2);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Value of $1 Invested'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Show All button - shows all countries
+        document.getElementById('showAllButton').addEventListener('click', function() {
+            let visibleCount = 0;
+
+            chart.data.datasets.forEach((dataset, index) => {
+                chart.setDatasetVisibility(index, true);
+                visibleCount++;
+            });
+
+            document.getElementById('countryCount').textContent = visibleCount;
+            chart.update();
+        });
+
+        // Hide All Countries button - hides all countries but keeps Global Average and Inflation
+        document.getElementById('hideAllButton').addEventListener('click', function() {
+            let visibleCount = 0;
+
+            chart.data.datasets.forEach((dataset, index) => {
+                // Always show inflation and global average
+                if (dataset.label === 'US Inflation (Cost of Living)' || dataset.label === 'Global Average') {
+                    chart.setDatasetVisibility(index, true);
+                    visibleCount++;
+                } else {
+                    chart.setDatasetVisibility(index, false);
+                }
+            });
+
+            document.getElementById('countryCount').textContent = visibleCount;
+            chart.update();
+        });
+
+        // Show Major Countries button - shows only major countries (and Global Average and Inflation)
+        document.getElementById('showMajorButton').addEventListener('click', function() {
+            let visibleCount = 0;
+
+            chart.data.datasets.forEach((dataset, index) => {
+                // Always show inflation and global average
+                if (dataset.label === 'US Inflation (Cost of Living)' || dataset.label === 'Global Average') {
+                    chart.setDatasetVisibility(index, true);
+                    visibleCount++;
+                } else if (majorCountries.includes(dataset.label)) {
+                    chart.setDatasetVisibility(index, true);
+                    visibleCount++;
+                } else {
+                    chart.setDatasetVisibility(index, false);
+                }
+            });
+
+            document.getElementById('countryCount').textContent = visibleCount;
+            chart.update();
+        });
+    });
+</script>

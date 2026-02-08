@@ -1,0 +1,218 @@
+from datetime import datetime
+
+# Sample medical receipt data
+receipts = [
+    {
+        "date": "2024-01-15",
+        "provider": "City General Hospital",
+        "category": "Medical",
+        "description": "Annual physical exam",
+        "amount": 250.00,
+        "hsa_eligible": True,
+        "reimbursed": True
+    },
+    {
+        "date": "2024-02-03",
+        "provider": "Vision Center",
+        "category": "Vision",
+        "description": "Eye exam and prescription glasses",
+        "amount": 385.00,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-03-20",
+        "provider": "Downtown Dental",
+        "category": "Dental",
+        "description": "Teeth cleaning and checkup",
+        "amount": 175.00,
+        "hsa_eligible": True,
+        "reimbursed": True
+    },
+    {
+        "date": "2024-04-12",
+        "provider": "ABC Pharmacy",
+        "category": "Prescription",
+        "description": "Prescription medications (3 months)",
+        "amount": 125.50,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-05-08",
+        "provider": "Physical Therapy Clinic",
+        "category": "Medical",
+        "description": "Physical therapy sessions (6 visits)",
+        "amount": 540.00,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-06-15",
+        "provider": "City General Hospital",
+        "category": "Medical",
+        "description": "Lab work and blood tests",
+        "amount": 320.00,
+        "hsa_eligible": True,
+        "reimbursed": True
+    },
+    {
+        "date": "2024-07-22",
+        "provider": "ABC Pharmacy",
+        "category": "Prescription",
+        "description": "Prescription medications (3 months)",
+        "amount": 125.50,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-08-10",
+        "provider": "Orthopedic Specialists",
+        "category": "Medical",
+        "description": "Consultation and X-rays",
+        "amount": 425.00,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-09-05",
+        "provider": "Downtown Dental",
+        "category": "Dental",
+        "description": "Dental filling",
+        "amount": 285.00,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-10-18",
+        "provider": "ABC Pharmacy",
+        "category": "Prescription",
+        "description": "Prescription medications (3 months)",
+        "amount": 125.50,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-11-02",
+        "provider": "Vision Center",
+        "category": "Vision",
+        "description": "Contact lenses (annual supply)",
+        "amount": 280.00,
+        "hsa_eligible": True,
+        "reimbursed": False
+    },
+    {
+        "date": "2024-12-10",
+        "provider": "City General Hospital",
+        "category": "Medical",
+        "description": "Flu shot and preventive care",
+        "amount": 85.00,
+        "hsa_eligible": True,
+        "reimbursed": True
+    },
+]
+
+# Calculate totals
+total_expenses = sum(r["amount"] for r in receipts)
+total_reimbursed = sum(r["amount"] for r in receipts if r["reimbursed"])
+total_pending = sum(r["amount"] for r in receipts if not r["reimbursed"])
+hsa_eligible = sum(r["amount"] for r in receipts if r["hsa_eligible"])
+
+# Category breakdown
+category_totals = {}
+for receipt in receipts:
+    cat = receipt["category"]
+    category_totals[cat] = category_totals.get(cat, 0) + receipt["amount"]
+
+--- html ---
+
+<section>
+    <div style="margin-bottom: 2rem;">
+        <a href="/" style="color: #667eea; text-decoration: none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <h1>Medical Receipts & HSA Tracking</h1>
+    <p>Track medical expenses and manage HSA-eligible reimbursements.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Total Medical Expenses</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(total_expenses)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">Year to date (2024)</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Reimbursed</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(total_reimbursed)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">{int((total_reimbursed / total_expenses) * 100)}% of total</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Pending Reimbursement</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(total_pending)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">Available to claim</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">HSA Eligible</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(hsa_eligible)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">100% of expenses</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 3rem;">
+        <h2>Expense Breakdown by Category</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
+            <div $for={(cat, amount) in category_totals.items()} style="padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #667eea;">
+                <div style="font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">{cat}</div>
+                <div style="font-size: 1.5rem; font-weight: bold; color: #333; margin-top: 0.25rem;">${'{:,.2f}'.format(amount)}</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 3rem;">
+        <h2>Receipt History</h2>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Date</th>
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Provider</th>
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Category</th>
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Description</th>
+                        <th style="padding: 1rem; text-align: right; font-weight: 600; color: #495057;">Amount</th>
+                        <th style="padding: 1rem; text-align: center; font-weight: 600; color: #495057;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr $for={receipt in receipts} style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 1rem; color: #212529;">{receipt['date']}</td>
+                        <td style="padding: 1rem; color: #212529;">{receipt['provider']}</td>
+                        <td style="padding: 1rem;">
+                            <span style="padding: 0.25rem 0.75rem; background: {'#e7f3ff' if receipt['category'] == 'Medical' else '#fff0f6' if receipt['category'] == 'Dental' else '#f0fff4' if receipt['category'] == 'Vision' else '#fff8e1'}; color: {'#0066cc' if receipt['category'] == 'Medical' else '#cc0066' if receipt['category'] == 'Dental' else '#00a86b' if receipt['category'] == 'Vision' else '#f57c00'}; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                                {receipt['category']}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem; color: #666;">{receipt['description']}</td>
+                        <td style="padding: 1rem; text-align: right; color: #212529; font-weight: 600;">${'{:,.2f}'.format(receipt['amount'])}</td>
+                        <td style="padding: 1rem; text-align: center;">
+                            <span style="padding: 0.25rem 0.75rem; background: {'#d4edda' if receipt['reimbursed'] else '#fff3cd'}; color: {'#155724' if receipt['reimbursed'] else '#856404'}; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                                {'✓ Reimbursed' if receipt['reimbursed'] else '⏳ Pending'}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; background: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 8px;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #2e7d32; font-size: 1.1rem;">💡 HSA Tips</h3>
+            <ul style="margin: 0; padding-left: 1.5rem; color: #666;">
+                <li style="margin-bottom: 0.5rem;">Save all medical receipts - you can reimburse yourself years later</li>
+                <li style="margin-bottom: 0.5rem;">HSA contributions are tax-deductible and grow tax-free</li>
+                <li style="margin-bottom: 0.5rem;">After age 65, HSA funds can be used for non-medical expenses (taxed as income)</li>
+                <li>Keep digital copies of receipts for easy tracking and verification</li>
+            </ul>
+        </div>
+    </div>
+</section>

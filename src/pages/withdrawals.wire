@@ -1,0 +1,106 @@
+from datetime import datetime
+
+# Sample withdrawal plan data
+current_age = 45
+retirement_age = 65
+current_balance = 850000.00
+expected_annual_return = 0.07
+inflation_rate = 0.03
+
+# Sample planned withdrawals
+planned_withdrawals = [
+    {"year": 2039, "age": 65, "amount": 40000.00, "reason": "First year retirement income"},
+    {"year": 2040, "age": 66, "amount": 41200.00, "reason": "Annual living expenses (inflation adjusted)"},
+    {"year": 2041, "age": 67, "amount": 42436.00, "reason": "Annual living expenses (inflation adjusted)"},
+    {"year": 2042, "age": 68, "amount": 43709.00, "reason": "Annual living expenses (inflation adjusted)"},
+    {"year": 2043, "age": 69, "amount": 45020.00, "reason": "Annual living expenses (inflation adjusted)"},
+    {"year": 2044, "age": 70, "amount": 46371.00, "reason": "Annual living expenses (inflation adjusted)"},
+    {"year": 2045, "age": 71, "amount": 47762.00, "reason": "Annual living expenses (inflation adjusted)"},
+]
+
+# Calculate total planned withdrawals
+total_planned = sum(w["amount"] for w in planned_withdrawals)
+
+# Estimate future balance (simplified calculation)
+years_to_retirement = retirement_age - current_age
+projected_balance = current_balance * ((1 + expected_annual_return) ** years_to_retirement)
+
+# Safe withdrawal rate (4% rule)
+safe_annual_withdrawal = projected_balance * 0.04
+
+--- html ---
+
+<section>
+    <div style="margin-bottom: 2rem;">
+        <a href="/" style="color: #667eea; text-decoration: none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <h1>Retirement Withdrawals</h1>
+    <p>Plan your retirement income strategy and track withdrawal schedules.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Current Balance</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(current_balance)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">As of today</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Projected at {retirement_age}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(projected_balance)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">Assumes {int(expected_annual_return * 100)}% annual return</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Safe Annual Withdrawal</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(safe_annual_withdrawal)}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">4% rule at retirement</div>
+        </div>
+
+        <div style="padding: 1.5rem; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Years to Retirement</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">{years_to_retirement}</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">Current age: {current_age}</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 3rem;">
+        <h2>Planned Withdrawal Schedule</h2>
+        <p style="color: #666; margin-bottom: 1.5rem;">Based on {int(inflation_rate * 100)}% annual inflation adjustment</p>
+
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Year</th>
+                        <th style="padding: 1rem; text-align: center; font-weight: 600; color: #495057;">Age</th>
+                        <th style="padding: 1rem; text-align: right; font-weight: 600; color: #495057;">Withdrawal Amount</th>
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #495057;">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr $for={withdrawal in planned_withdrawals} style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 1rem; color: #212529; font-weight: 500;">{withdrawal['year']}</td>
+                        <td style="padding: 1rem; text-align: center; color: #212529;">
+                            <span style="padding: 0.25rem 0.75rem; background: #e7f3ff; color: #0066cc; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                                {withdrawal['age']}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem; text-align: right; color: #212529; font-weight: 600; font-size: 1.1rem;">${'{:,.2f}'.format(withdrawal['amount'])}</td>
+                        <td style="padding: 1rem; color: #666;">{withdrawal['reason']}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff8e1; border-left: 4px solid #ffc107; border-radius: 8px;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #f57c00; font-size: 1.1rem;">📊 Planning Notes</h3>
+            <ul style="margin: 0; padding-left: 1.5rem; color: #666;">
+                <li style="margin-bottom: 0.5rem;">The 4% rule suggests withdrawing 4% of your retirement balance annually</li>
+                <li style="margin-bottom: 0.5rem;">Consider required minimum distributions (RMDs) starting at age 73</li>
+                <li style="margin-bottom: 0.5rem;">Factor in Social Security benefits and pension income</li>
+                <li>Adjust for taxes based on your account types (traditional vs. Roth)</li>
+            </ul>
+        </div>
+    </div>
+</section>
