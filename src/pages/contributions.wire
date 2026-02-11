@@ -8,21 +8,26 @@ planned_retirement_age = wire(65)
 annual_income = wire(83592)  # Numeric value for calculations
 annual_income_display = wire("83,592")  # Formatted string for display
 expected_income_growth = wire(3.0)
+expected_investment_return = wire(7.0)
 
 # 401k reactive inputs
-balance_401k = wire(0)
+balance_401k = wire(41000)
 contribution_401k_percent = wire(8.0)
 employer_match_percent = wire(87.5)
 employer_match_limit = wire(7.0)
 
 # Roth IRA reactive inputs
-balance_roth = wire(0)
-annual_roth_contribution = wire(0)
+balance_roth = wire(48000)
+annual_roth_contribution = wire(7500)
+
+# UI state - track which sections are open
+details_401k_open = wire(False)
+details_roth_open = wire(False)
 
 # Limits (constants)
-limit_401k = 23500.00
+limit_401k = 24500.00
 limit_401k_total = 72000.00
-limit_roth = 7000.00
+limit_roth = 7500.00
 
 # Helper functions to calculate derived values (called from template)
 def calc_years_to_retirement():
@@ -49,23 +54,19 @@ def calc_total_annual_savings():
     return min(calc_total_annual_contribution() + calc_annual_employer_match(), limit_401k_total)
 
 def calc_total_saved_by_retirement():
-    """Calculate total balance at retirement accounting for income growth."""
-    return calc_current_balance() + calc_total_roth_by_retirement() + calc_total_401k_by_retirement()
-
-def calc_total_401k_by_retirement():
-    """Calculate total 401k balance including contributions and employer match, accounting for income growth over time."""
+    """Calculate total contributions (principal only, without investment returns)."""
     years = calc_years_to_retirement()
-    if years == 0 or annual_income.value == 0:
-        return 0.0
+    if years == 0:
+        return calc_current_balance()
 
     growth_rate = expected_income_growth.value / 100.0
-    total_401k = 0.0
+    total_principal = calc_current_balance()
 
     for year in range(years):
-        # Calculate income for this year with growth
+        # Calculate income for this year
         year_income = annual_income.value * ((1 + growth_rate) ** year)
 
-        # Calculate 401k contribution for this year (limit applied AFTER income growth)
+        # Calculate 401k contribution for this year
         year_401k_contrib = min(year_income * (contribution_401k_percent.value / 100.0), limit_401k)
 
         # Calculate employer match for this year
@@ -73,14 +74,92 @@ def calc_total_401k_by_retirement():
         match_limit_dollars = year_income * (employer_match_limit.value / 100.0)
         year_match = min(match_on_contribution, match_limit_dollars)
 
-        # Add both contribution and match to total
-        total_401k += min(year_401k_contrib + year_match, limit_401k_total)
+        # Add contributions (principal only, no returns)
+        total_principal += min(year_401k_contrib + year_match, limit_401k_total) + annual_roth_contribution.value
 
-    return total_401k
+    return total_principal
+
+def calc_projected_balance_at_retirement():
+    """Calculate projected balance at retirement including investment returns."""
+    return calc_total_401k_by_retirement() + calc_total_roth_by_retirement()
+
+def calc_total_401k_by_retirement():
+    """Calculate total 401k balance at retirement including investment returns."""
+    years = calc_years_to_retirement()
+    if years == 0:
+        return balance_401k.value
+
+    growth_rate = expected_income_growth.value / 100.0
+    return_rate = expected_investment_return.value / 100.0
+    balance = balance_401k.value
+
+    for year in range(years):
+        # Apply investment returns
+        balance = balance * (1 + return_rate)
+
+        # Calculate income for this year
+        year_income = annual_income.value * ((1 + growth_rate) ** year)
+
+        # Calculate 401k contribution for this year
+        year_401k_contrib = min(year_income * (contribution_401k_percent.value / 100.0), limit_401k)
+
+        # Calculate employer match for this year
+        match_on_contribution = year_401k_contrib * (employer_match_percent.value / 100.0)
+        match_limit_dollars = year_income * (employer_match_limit.value / 100.0)
+        year_match = min(match_on_contribution, match_limit_dollars)
+
+        # Add contributions
+        balance += min(year_401k_contrib + year_match, limit_401k_total)
+
+    return balance
 
 def calc_total_roth_by_retirement():
-    """Calculate total Roth IRA contributions (fixed amount per year)."""
-    return annual_roth_contribution.value * calc_years_to_retirement()
+    """Calculate total Roth IRA balance at retirement including investment returns."""
+    years = calc_years_to_retirement()
+    if years == 0:
+        return balance_roth.value
+
+    return_rate = expected_investment_return.value / 100.0
+    balance = balance_roth.value
+
+    for year in range(years):
+        # Apply investment returns
+        balance = balance * (1 + return_rate)
+
+        # Add annual contribution
+        balance += annual_roth_contribution.value
+
+    return balance
+
+def calc_401k_principal_by_retirement():
+    """Calculate 401k contributions only (principal, no returns) for breakdown display."""
+    years = calc_years_to_retirement()
+    if years == 0:
+        return balance_401k.value
+
+    growth_rate = expected_income_growth.value / 100.0
+    total_principal = balance_401k.value
+
+    for year in range(years):
+        # Calculate income for this year
+        year_income = annual_income.value * ((1 + growth_rate) ** year)
+
+        # Calculate 401k contribution for this year
+        year_401k_contrib = min(year_income * (contribution_401k_percent.value / 100.0), limit_401k)
+
+        # Calculate employer match for this year
+        match_on_contribution = year_401k_contrib * (employer_match_percent.value / 100.0)
+        match_limit_dollars = year_income * (employer_match_limit.value / 100.0)
+        year_match = min(match_on_contribution, match_limit_dollars)
+
+        # Add contributions (principal only)
+        total_principal += min(year_401k_contrib + year_match, limit_401k_total)
+
+    return total_principal
+
+def calc_roth_principal_by_retirement():
+    """Calculate Roth IRA contributions only (principal, no returns) for breakdown display."""
+    return balance_roth.value + (annual_roth_contribution.value * calc_years_to_retirement())
 
 def get_401k_contribution_status():
     """Get status text for 401k contribution (maxed or percentage of limit)."""
@@ -105,14 +184,21 @@ def calc_chart_data():
     years_range = list(range(current_age.value, planned_retirement_age.value + 1)) if calc_years_to_retirement() > 0 else [current_age.value]
     num_years = len(years_range)
     growth_rate = expected_income_growth.value / 100.0
+    return_rate = expected_investment_return.value / 100.0
 
     # Calculate cumulative balances year by year, accounting for income growth
-    yearly_401k_balance = []
-    yearly_roth_balance = []
-    yearly_total_balance = []
+    yearly_401k_balance = []  # 401k with returns
+    yearly_roth_balance = []  # Roth with returns
+    yearly_total_balance = []  # Total contributions (principal only)
+    yearly_projected_balance = []  # Total with returns (401k + Roth)
 
-    cumulative_401k = balance_401k.value
-    cumulative_roth = balance_roth.value
+    # Track contributions (principal only)
+    cumulative_401k_contributions = balance_401k.value
+    cumulative_roth_contributions = balance_roth.value
+
+    # Track balances with investment returns
+    balance_401k_with_returns = balance_401k.value
+    balance_roth_with_returns = balance_roth.value
 
     for year_index in range(num_years):
         # Calculate income for this year
@@ -129,19 +215,31 @@ def calc_chart_data():
         else:
             year_match = 0
 
-        # Add this year's contributions to cumulative totals
-        cumulative_401k += year_401k_contrib + year_match
-        cumulative_roth += annual_roth_contribution.value if year_index > 0 else 0
+        # Add this year's contributions to principal totals
+        cumulative_401k_contributions += year_401k_contrib + year_match
+        cumulative_roth_contributions += annual_roth_contribution.value if year_index > 0 else 0
 
-        yearly_401k_balance.append(round(cumulative_401k, 2))
-        yearly_roth_balance.append(round(cumulative_roth, 2))
-        yearly_total_balance.append(round(cumulative_401k + cumulative_roth, 2))
+        # Apply investment returns to each account separately
+        if year_index > 0:
+            # Apply returns to 401k balance, then add new contributions
+            balance_401k_with_returns = balance_401k_with_returns * (1 + return_rate)
+            balance_401k_with_returns += year_401k_contrib + year_match
+
+            # Apply returns to Roth balance, then add new contributions
+            balance_roth_with_returns = balance_roth_with_returns * (1 + return_rate)
+            balance_roth_with_returns += annual_roth_contribution.value
+
+        yearly_401k_balance.append(round(balance_401k_with_returns, 2))
+        yearly_roth_balance.append(round(balance_roth_with_returns, 2))
+        yearly_total_balance.append(round(cumulative_401k_contributions + cumulative_roth_contributions, 2))
+        yearly_projected_balance.append(round(balance_401k_with_returns + balance_roth_with_returns, 2))
 
     data = {
         "years": years_range,
         "yearly_401k": yearly_401k_balance,
         "yearly_roth": yearly_roth_balance,
-        "yearly_total": yearly_total_balance
+        "yearly_total": yearly_total_balance,
+        "yearly_projected": yearly_projected_balance
     }
     return json.dumps(data)
 
@@ -171,6 +269,9 @@ def update_annual_income(event):
 def update_income_growth(event):
     expected_income_growth.value = float(event.value) if event.value else 0.0
 
+def update_investment_return(event):
+    expected_investment_return.value = float(event.value) if event.value else 0.0
+
 def update_balance_401k(event):
     balance_401k.value = parse_formatted_number(event.value)
 
@@ -190,6 +291,13 @@ def update_roth_contribution(event):
     parsed = parse_formatted_number(event.value)
     annual_roth_contribution.value = min(parsed, limit_roth)
 
+# UI toggle handlers
+def toggle_401k_section():
+    details_401k_open.value = not details_401k_open.value
+
+def toggle_roth_section():
+    details_roth_open.value = not details_roth_open.value
+
 ---
 <div>
 <section>
@@ -206,7 +314,7 @@ def update_roth_contribution(event):
             <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <h2 style="margin: 0 0 1rem 0; color: #333; font-size: 1.1rem;">Your Information</h2>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                     <div>
                         <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
                             Current Age
@@ -235,9 +343,30 @@ def update_roth_contribution(event):
                     </div>
                 </div>
 
-                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
-                        401(k) or 403(b)
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
+                        Expected Investment Return
+                    </label>
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <span style="position: absolute; left: 10px; color: #666;">%</span>
+                        <input
+                            type="number"
+                            class="percent-input"
+                            value={expected_investment_return.value}
+                            @input={update_investment_return}
+                            style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.8rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
+                            placeholder="7.0"
+                            step="0.5"
+                        />
+                    </div>
+                    <div style="margin-top: 0.2rem; font-size: 0.8rem; color: #666;">
+                        Average annual return on investments
+                    </div>
+                </div>
+
+                <details open={details_401k_open.value} style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary @click={toggle_401k_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
+                        401(k)
                     </summary>
 
                     <div style="padding: 0 1rem 1rem 1rem;">
@@ -427,21 +556,15 @@ def update_roth_contribution(event):
 
                 <div style="display: grid; gap: 0.75rem;">
                     <div style="padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Years to Retirement</div>
-                        <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">{calc_years_to_retirement()}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Age {current_age.value} → {planned_retirement_age.value}</div>
-                    </div>
-
-                    <div style="padding: 1rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 6px; color: white;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Annual Savings</div>
-                        <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">${'{:,.0f}'.format(calc_total_annual_savings())}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">You: ${'{:,.0f}'.format(calc_total_annual_contribution())} + Match: ${'{:,.0f}'.format(calc_annual_employer_match())}</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Projected Balance at Retirement</div>
+                        <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">${'{:,.0f}'.format(calc_projected_balance_at_retirement())}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">With {expected_investment_return.value}% annual returns</div>
                     </div>
 
                     <div style="padding: 1rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 6px; color: white;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Balance at Retirement</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Total Contributions</div>
                         <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">${'{:,.0f}'.format(calc_total_saved_by_retirement())}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Without growth</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">Without investment returns</div>
                     </div>
 
                     <div style="padding: 1rem; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 6px; color: white;">
@@ -450,14 +573,14 @@ def update_roth_contribution(event):
                         <div style="font-size: 0.75rem; opacity: 0.85; line-height: 1.4;">
                             Pre-tax: {'{:.1f}'.format((calc_annual_401k_contribution() / annual_income.value * 100) if annual_income.value > 0 else 0)}% • 
                             Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}% • 
-                            Match: {'{:.1f}'.format((calc_annual_employer_match() / annual_income.value * 100) if annual_income.value > 0 else 0)}%
+                            Employer Match: {'{:.1f}'.format((calc_annual_employer_match() / annual_income.value * 100) if annual_income.value > 0 else 0)}%
                         </div>
                     </div>
                 </div>
             </div>
 
             <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <h3 style="margin: 0 0 0.75rem 0; color: #333; font-size: 1rem;">Breakdown</h3>
+                <h3 style="margin: 0 0 0.75rem 0; color: #333; font-size: 1rem;">Projected Balance Breakdown</h3>
 
                 <div style="margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
@@ -465,7 +588,7 @@ def update_roth_contribution(event):
                         <span style="font-weight: 600; font-size: 0.9rem;">${'{:,.0f}'.format(calc_total_401k_by_retirement())}</span>
                     </div>
                     <div style="height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden;">
-                        <div style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: {min(100, (calc_total_401k_by_retirement() / calc_total_saved_by_retirement() * 100) if calc_total_saved_by_retirement() > 0 else 0)}%;"></div>
+                        <div style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: {min(100, (calc_total_401k_by_retirement() / calc_projected_balance_at_retirement() * 100) if calc_projected_balance_at_retirement() > 0 else 0)}%;"></div>
                     </div>
                 </div>
 
@@ -475,22 +598,15 @@ def update_roth_contribution(event):
                         <span style="font-weight: 600; font-size: 0.9rem;">${'{:,.0f}'.format(calc_total_roth_by_retirement())}</span>
                     </div>
                     <div style="height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden;">
-                        <div style="height: 100%; background: linear-gradient(90deg, #f093fb, #f5576c); width: {min(100, (calc_total_roth_by_retirement() / calc_total_saved_by_retirement() * 100) if calc_total_saved_by_retirement() > 0 else 0)}%;"></div>
+                        <div style="height: 100%; background: linear-gradient(90deg, #f093fb, #f5576c); width: {min(100, (calc_total_roth_by_retirement() / calc_projected_balance_at_retirement() * 100) if calc_projected_balance_at_retirement() > 0 else 0)}%;"></div>
                     </div>
                 </div>
 
                 <div style="border-top: 1px solid #f0f0f0; padding-top: 0.75rem; margin-top: 0.75rem;">
                     <div style="display: flex; justify-content: space-between;">
                         <span style="font-weight: 600;">Total</span>
-                        <span style="font-weight: 700; font-size: 1.1rem; color: #667eea;">${'{:,.0f}'.format(calc_total_saved_by_retirement())}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: #667eea;">${'{:,.0f}'.format(calc_projected_balance_at_retirement())}</span>
                     </div>
-                </div>
-            </div>
-
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #e3f2fd; border-left: 3px solid #2196f3; border-radius: 6px;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #1976d2; font-size: 0.95rem;">💡 Note</div>
-                <div style="font-size: 0.85rem; color: #666; line-height: 1.5;">
-                    This shows contributions only. Investment growth based on historical market data will be added in the next step.
                 </div>
             </div>
         </div>
@@ -502,6 +618,13 @@ def update_roth_contribution(event):
             <div style="position: relative; height: 500px;">
                 <canvas id="contributionsChart"></canvas>
             </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 1.5rem; padding: 1rem; background: #e3f2fd; border-left: 3px solid #2196f3; border-radius: 6px;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: #1976d2; font-size: 0.95rem;">💡 Note</div>
+        <div style="font-size: 0.85rem; color: #666; line-height: 1.5;">
+            All projected balances assume constant annual returns of {expected_investment_return.value}%. Actual returns will vary year to year and may be higher or lower.
         </div>
     </div>
 </section>
@@ -544,16 +667,27 @@ def update_roth_contribution(event):
                         pointHoverRadius: 6
                     },
                     {
-                        label: 'Total Balance',
+                        label: 'Total Contributions',
                         data: chartData.yearly_total,
-                        borderColor: 'rgb(79, 172, 254)',
-                        backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                        borderColor: 'rgb(158, 158, 158)',
+                        backgroundColor: 'rgba(158, 158, 158, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'Total Balance',
+                        data: chartData.yearly_projected,
+                        borderColor: 'rgb(67, 233, 123)',
+                        backgroundColor: 'rgba(67, 233, 123, 0.1)',
                         borderWidth: 4,
                         fill: false,
                         tension: 0.3,
                         pointRadius: 4,
-                        pointHoverRadius: 7,
-                        borderDash: [5, 5]
+                        pointHoverRadius: 7
                     }
                 ]
             },
@@ -644,6 +778,7 @@ def update_roth_contribution(event):
                         chart.data.datasets[0].data = newData.yearly_401k;
                         chart.data.datasets[1].data = newData.yearly_roth;
                         chart.data.datasets[2].data = newData.yearly_total;
+                        chart.data.datasets[3].data = newData.yearly_projected;
 
                         // Refresh chart
                         chart.update();
