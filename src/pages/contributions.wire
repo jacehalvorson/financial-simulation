@@ -19,10 +19,6 @@ employer_match_limit = wire(7.0)
 balance_roth = wire(0)
 annual_roth_contribution = wire(0)
 
-# UI state - track which sections are open
-details_401k_open = wire(True)
-details_roth_open = wire(True)
-
 # Limits (constants)
 limit_401k = 23500.00
 limit_401k_total = 72000.00
@@ -194,13 +190,6 @@ def update_roth_contribution(event):
     parsed = parse_formatted_number(event.value)
     annual_roth_contribution.value = min(parsed, limit_roth)
 
-# UI toggle handlers
-def toggle_401k_section():
-    details_401k_open.value = not details_401k_open.value
-
-def toggle_roth_section():
-    details_roth_open.value = not details_roth_open.value
-
 ---
 <div>
 <section>
@@ -246,12 +235,12 @@ def toggle_roth_section():
                     </div>
                 </div>
 
-                <details open={details_401k_open.value} style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <summary @click={toggle_401k_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem;">
+                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
                         401(k) or 403(b)
                     </summary>
 
-                    <div style="margin-top: 0.75rem;">
+                    <div style="padding: 0 1rem 1rem 1rem;">
                         <div style="border-bottom: 1px solid #f0f0f0; margin-bottom: 0.75rem; padding-bottom: 0.75rem;">
                             <h4 style="margin: 0 0 0.5rem 0; color: #555; font-size: 0.95rem; font-weight: 600;">Income</h4>
 
@@ -383,12 +372,12 @@ def toggle_roth_section():
                     </div>
                 </details>
 
-                <details open={details_roth_open.value} style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <summary @click={toggle_roth_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem;">
+                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
                         Roth IRA
                     </summary>
 
-                    <div style="margin-top: 0.75rem;">
+                    <div style="padding: 0 1rem 1rem 1rem;">
                         <div style="margin-bottom: 0.75rem;">
                             <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
                                 Current Balance
@@ -459,8 +448,8 @@ def toggle_roth_section():
                         <div style="font-size: 0.85rem; opacity: 0.9;">Total Savings Rate</div>
                         <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">{'{:.1f}'.format(((calc_annual_401k_contribution() + annual_roth_contribution.value + calc_annual_employer_match()) / annual_income.value * 100) if annual_income.value > 0 else 0)}%</div>
                         <div style="font-size: 0.75rem; opacity: 0.85; line-height: 1.4;">
-                            Pre-tax: {'{:.1f}'.format((calc_annual_401k_contribution() / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
-                            Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
+                            Pre-tax: {'{:.1f}'.format((calc_annual_401k_contribution() / annual_income.value * 100) if annual_income.value > 0 else 0)}% • 
+                            Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}% • 
                             Match: {'{:.1f}'.format((calc_annual_employer_match() / annual_income.value * 100) if annual_income.value > 0 else 0)}%
                         </div>
                     </div>
