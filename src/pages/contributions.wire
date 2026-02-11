@@ -1,5 +1,5 @@
 ---
-from pywire import derived
+from pywire import wire, derived
 import json
 
 # Reactive input values - these are the only wires we need
@@ -59,22 +59,22 @@ def calc_total_saved_by_retirement():
 def calc_total_401k_by_retirement():
     """Calculate total 401k balance including contributions and employer match, accounting for income growth over time."""
     years = calc_years_to_retirement()
-    if years == 0 or $annual_income == 0:
+    if years == 0 or annual_income.value == 0:
         return 0.0
 
-    growth_rate = $expected_income_growth / 100.0
+    growth_rate = expected_income_growth.value / 100.0
     total_401k = 0.0
 
     for year in range(years):
         # Calculate income for this year with growth
-        year_income = $annual_income * ((1 + growth_rate) ** year)
+        year_income = annual_income.value * ((1 + growth_rate) ** year)
 
         # Calculate 401k contribution for this year (limit applied AFTER income growth)
-        year_401k_contrib = min(year_income * ($contribution_401k_percent / 100.0), limit_401k)
+        year_401k_contrib = min(year_income * (contribution_401k_percent.value / 100.0), limit_401k)
 
         # Calculate employer match for this year
-        match_on_contribution = year_401k_contrib * ($employer_match_percent / 100.0)
-        match_limit_dollars = year_income * ($employer_match_limit / 100.0)
+        match_on_contribution = year_401k_contrib * (employer_match_percent.value / 100.0)
+        match_limit_dollars = year_income * (employer_match_limit.value / 100.0)
         year_match = min(match_on_contribution, match_limit_dollars)
 
         # Add both contribution and match to total
@@ -84,7 +84,7 @@ def calc_total_401k_by_retirement():
 
 def calc_total_roth_by_retirement():
     """Calculate total Roth IRA contributions (fixed amount per year)."""
-    return $annual_roth_contribution * calc_years_to_retirement()
+    return annual_roth_contribution.value * calc_years_to_retirement()
 
 def get_401k_contribution_status():
     """Get status text for 401k contribution (maxed or percentage of limit)."""
@@ -108,34 +108,34 @@ def calc_chart_data():
     """Generate chart data as JSON string for the Chart.js visualization."""
     years_range = list(range(current_age.value, planned_retirement_age.value + 1)) if calc_years_to_retirement() > 0 else [current_age.value]
     num_years = len(years_range)
-    growth_rate = $expected_income_growth / 100.0
+    growth_rate = expected_income_growth.value / 100.0
 
     # Calculate cumulative balances year by year, accounting for income growth
     yearly_401k_balance = []
     yearly_roth_balance = []
     yearly_total_balance = []
 
-    cumulative_401k = $balance_401k
-    cumulative_roth = $balance_roth
+    cumulative_401k = balance_401k.value
+    cumulative_roth = balance_roth.value
 
     for year_index in range(num_years):
         # Calculate income for this year
-        year_income = $annual_income * ((1 + growth_rate) ** year_index)
+        year_income = annual_income.value * ((1 + growth_rate) ** year_index)
 
         # Calculate 401k contribution for this year (capped at limit)
-        year_401k_contrib = min(year_income * ($contribution_401k_percent / 100.0), limit_401k) if year_index > 0 else 0
+        year_401k_contrib = min(year_income * (contribution_401k_percent.value / 100.0), limit_401k) if year_index > 0 else 0
 
         # Calculate employer match for this year
         if year_index > 0 and year_income > 0:
-            match_on_contribution = year_401k_contrib * ($employer_match_percent / 100.0)
-            match_limit_dollars = year_income * ($employer_match_limit / 100.0)
+            match_on_contribution = year_401k_contrib * (employer_match_percent.value / 100.0)
+            match_limit_dollars = year_income * (employer_match_limit.value / 100.0)
             year_match = min(match_on_contribution, match_limit_dollars)
         else:
             year_match = 0
 
         # Add this year's contributions to cumulative totals
         cumulative_401k += year_401k_contrib + year_match
-        cumulative_roth += $annual_roth_contribution if year_index > 0 else 0
+        cumulative_roth += annual_roth_contribution.value if year_index > 0 else 0
 
         yearly_401k_balance.append(round(cumulative_401k, 2))
         yearly_roth_balance.append(round(cumulative_roth, 2))
@@ -457,10 +457,10 @@ def toggle_roth_section():
 
                     <div style="padding: 1rem; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 6px; color: white;">
                         <div style="font-size: 0.85rem; opacity: 0.9;">Total Savings Rate</div>
-                        <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">{'{:.1f}'.format(((calc_annual_401k_contribution() + $annual_roth_contribution + calc_annual_employer_match()) / annual_income.value * 100) if annual_income.value > 0 else 0)}%</div>
+                        <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">{'{:.1f}'.format(((calc_annual_401k_contribution() + annual_roth_contribution.value + calc_annual_employer_match()) / annual_income.value * 100) if annual_income.value > 0 else 0)}%</div>
                         <div style="font-size: 0.75rem; opacity: 0.85; line-height: 1.4;">
                             Pre-tax: {'{:.1f}'.format((calc_annual_401k_contribution() / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
-                            Post-tax: {'{:.1f}'.format(($annual_roth_contribution / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
+                            Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
                             Match: {'{:.1f}'.format((calc_annual_employer_match() / annual_income.value * 100) if annual_income.value > 0 else 0)}%
                         </div>
                     </div>
@@ -528,120 +528,120 @@ def toggle_roth_section():
 
             const ctx = document.getElementById('contributionsChart').getContext('2d');
             const chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.years,
-                    datasets: [
-                        {
-                            label: '401(k) Balance',
-                            data: chartData.yearly_401k,
-                            borderColor: 'rgb(102, 126, 234)',
-                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.3,
-                            pointRadius: 3,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Roth IRA Balance',
-                            data: chartData.yearly_roth,
-                            borderColor: 'rgb(240, 147, 251)',
-                            backgroundColor: 'rgba(240, 147, 251, 0.1)',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.3,
-                            pointRadius: 3,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Total Balance',
-                            data: chartData.yearly_total,
-                            borderColor: 'rgb(79, 172, 254)',
-                            backgroundColor: 'rgba(79, 172, 254, 0.1)',
-                            borderWidth: 4,
-                            fill: false,
-                            tension: 0.3,
-                            pointRadius: 4,
-                            pointHoverRadius: 7,
-                            borderDash: [5, 5]
-                        }
-                    ]
+            type: 'line',
+            data: {
+                labels: chartData.years,
+                datasets: [
+                    {
+                        label: '401(k) Balance',
+                        data: chartData.yearly_401k,
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Roth IRA Balance',
+                        data: chartData.yearly_roth,
+                        borderColor: 'rgb(240, 147, 251)',
+                        backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Total Balance',
+                        data: chartData.yearly_total,
+                        borderColor: 'rgb(79, 172, 254)',
+                        backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                        borderWidth: 4,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointHoverRadius: 7,
+                        borderDash: [5, 5]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                boxWidth: 20,
-                                font: {
-                                    size: 12
-                                },
-                                padding: 15
-                            }
-                        },
-                        title: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': $';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y.toLocaleString('en-US', {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 0
-                                        });
-                                    }
-                                    return label;
-                                },
-                                title: function(context) {
-                                    return 'Age ' + context[0].label;
-                                }
-                            }
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            boxWidth: 20,
+                            font: {
+                                size: 12
+                            },
+                            padding: 15
                         }
                     },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            title: {
-                                display: true,
-                                text: 'Balance ($)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value.toLocaleString('en-US', {
+                    title: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': $';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y.toLocaleString('en-US', {
                                         minimumFractionDigits: 0,
                                         maximumFractionDigits: 0
                                     });
                                 }
+                                return label;
                             },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            },
-                            beginAtZero: true
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Age'
-                            },
-                            grid: {
-                                display: false
+                            title: function(context) {
+                                return 'Age ' + context[0].label;
                             }
                         }
                     }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Balance ($)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString('en-US', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                });
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        beginAtZero: true
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Age'
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
                 }
+            }
             });
 
             // Watch for changes to data-chart attribute on the permanent container
@@ -649,13 +649,13 @@ def toggle_roth_section():
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'data-chart') {
                         const newData = JSON.parse(container.dataset.chart);
-                        
+
                         // Update chart data
                         chart.data.labels = newData.years;
                         chart.data.datasets[0].data = newData.yearly_401k;
                         chart.data.datasets[1].data = newData.yearly_roth;
                         chart.data.datasets[2].data = newData.yearly_total;
-                        
+
                         // Refresh chart
                         chart.update();
                     }
@@ -667,38 +667,105 @@ def toggle_roth_section():
 
         // Real-time comma formatting for dollar inputs
         document.addEventListener('DOMContentLoaded', function() {
-            const dollarInputs = document.querySelectorAll('.dollar-input');
+        const dollarInputs = document.querySelectorAll('.dollar-input');
+        
+        dollarInputs.forEach(input => {
+            input.addEventListener('input', function(e) {
+                // Get current cursor position
+                const cursorPosition = this.selectionStart;
+                const oldValue = this.value;
 
-            dollarInputs.forEach(input => {
-                input.addEventListener('input', function(e) {
-                    // Get current cursor position
-                    const cursorPosition = this.selectionStart;
-                    const oldValue = this.value;
+                // Remove all non-digit characters
+                const numericValue = oldValue.replace(/[^\d]/g, '');
 
-                    // Remove all non-digit characters
-                    const numericValue = oldValue.replace(/[^\d]/g, '');
+                // Format with commas
+                let formattedValue = '';
+                if (numericValue) {
+                    formattedValue = parseInt(numericValue, 10).toLocaleString('en-US');
+                }
 
-                    // Format with commas
-                    let formattedValue = '';
-                    if (numericValue) {
-                        formattedValue = parseInt(numericValue, 10).toLocaleString('en-US');
-                    }
+                // Update the display value
+                this.value = formattedValue;
 
-                    // Update the display value
-                    this.value = formattedValue;
+                // Calculate new cursor position
+                // Count commas before old cursor position
+                const commasBeforeOld = (oldValue.slice(0, cursorPosition).match(/,/g) || []).length;
+                // Count commas before new cursor position
+                const commasBeforeNew = (formattedValue.slice(0, cursorPosition).match(/,/g) || []).length;
+                // Adjust cursor position based on comma difference
+                const newCursorPosition = cursorPosition + (commasBeforeNew - commasBeforeOld);
 
-                    // Calculate new cursor position
-                    // Count commas before old cursor position
-                    const commasBeforeOld = (oldValue.slice(0, cursorPosition).match(/,/g) || []).length;
-                    // Count commas before new cursor position
-                    const commasBeforeNew = (formattedValue.slice(0, cursorPosition).match(/,/g) || []).length;
-                    // Adjust cursor position based on comma difference
-                    const newCursorPosition = cursorPosition + (commasBeforeNew - commasBeforeOld);
-
-                    // Restore cursor position
-                    this.setSelectionRange(newCursorPosition, newCursorPosition);
-                });
+                // Restore cursor position
+                this.setSelectionRange(newCursorPosition, newCursorPosition);
             });
         });
+
+        // Clear-on-focus behavior for percentage inputs
+        const percentInputs = document.querySelectorAll('.percent-input');
+
+        percentInputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                // Store the current value
+                this.dataset.oldValue = this.value;
+                // Set it as placeholder
+                this.placeholder = this.value;
+                // Clear the value
+                this.value = '';
+            });
+
+            input.addEventListener('blur', function() {
+                // If the input is empty, restore the old value
+                if (this.value === '' && this.dataset.oldValue) {
+                    this.value = this.dataset.oldValue;
+                }
+                // Clear the stored value
+                delete this.dataset.oldValue;
+            });
+        });
+
+        // Clear-on-focus behavior for number inputs (age fields)
+        const numberInputs = document.querySelectorAll('.number-input');
+
+        numberInputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                // Store the current value
+                this.dataset.oldValue = this.value;
+                // Set it as placeholder
+                this.placeholder = this.value;
+                // Clear the value
+                this.value = '';
+            });
+
+            input.addEventListener('blur', function() {
+                // If the input is empty, restore the old value
+                if (this.value === '' && this.dataset.oldValue) {
+                    this.value = this.dataset.oldValue;
+                }
+                // Clear the stored value
+                delete this.dataset.oldValue;
+            });
+        });
+
+        // Clear-on-focus behavior for dollar inputs
+        dollarInputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                // Store the current value
+                this.dataset.oldValue = this.value;
+                // Set it as placeholder
+                this.placeholder = this.value;
+                // Clear the value
+                this.value = '';
+            });
+
+            input.addEventListener('blur', function() {
+                // If the input is empty, restore the old value
+                if (this.value === '' && this.dataset.oldValue) {
+                    this.value = this.dataset.oldValue;
+                }
+                // Clear the stored value
+                delete this.dataset.oldValue;
+            });
+        });
+    });
 </script>
 </div>
