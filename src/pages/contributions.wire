@@ -809,7 +809,8 @@ def toggle_hsa_section():
                         fill: false,
                         tension: 0.3,
                         pointRadius: 3,
-                        pointHoverRadius: 6
+                        pointHoverRadius: 6,
+                        hidden: true
                     },
                     {
                         label: 'Roth IRA Balance',
@@ -820,7 +821,8 @@ def toggle_hsa_section():
                         fill: false,
                         tension: 0.3,
                         pointRadius: 3,
-                        pointHoverRadius: 6
+                        pointHoverRadius: 6,
+                        hidden: true
                     },
                     {
                         label: 'HSA Balance',
@@ -831,7 +833,8 @@ def toggle_hsa_section():
                         fill: false,
                         tension: 0.3,
                         pointRadius: 3,
-                        pointHoverRadius: 6
+                        pointHoverRadius: 6,
+                        hidden: true
                     },
                     {
                         label: 'Total Contributions',
@@ -939,6 +942,28 @@ def toggle_hsa_section():
                     }
                 }
             }
+            });
+
+            // Hide tooltip when clicking/tapping outside the chart or outside the plotting area
+            const canvas = document.getElementById('contributionsChart');
+
+            // Click outside the chart entirely
+            document.addEventListener('click', function(e) {
+                if (canvas && !canvas.contains(e.target)) {
+                    chart.setActiveElements([]);
+                    chart.tooltip.setActiveElements([]);
+                    chart.update();
+                }
+            });
+
+            // Click on canvas but outside data points (legend, axes, padding, etc.)
+            canvas.addEventListener('click', function(e) {
+                const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+                if (points.length === 0) {
+                    chart.setActiveElements([]);
+                    chart.tooltip.setActiveElements([]);
+                    chart.update();
+                }
             });
 
             // Watch for changes to data-chart attribute on the permanent container
