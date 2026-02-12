@@ -198,7 +198,7 @@ user = wire(name="Alice", age=30, role="admin")
 
 [Section titled “Reading Values”](#reading-values)
 
-You access the underlying value using the `.value` property.
+You access the underlying value using the `.value` property. Only use this in Python snippets. In HTML, use the value directly such as `count`.
 
 ```python
 print(count.value)

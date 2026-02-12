@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>financial-simulation</title>
+    <title>Financial Simulation</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 </head>
 <body>
     <header class="container">
         <nav>
             <ul>
-                <li><strong>financial-simulation</strong></li>
+                <li><strong>Financial Simulation</strong></li>
             </ul>
             <ul>
                 <li><a href="/">Home</a></li>
