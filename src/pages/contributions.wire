@@ -6,7 +6,7 @@ import json
 current_age = wire(35)
 planned_retirement_age = wire(65)
 annual_income = wire(83592)
-expected_income_growth = wire(3.0)
+expected_income_growth = wire(6.15)
 expected_investment_return = wire(7.0)
 
 # 401k reactive inputs
@@ -22,11 +22,6 @@ annual_roth_contribution = wire(7500)
 # HSA reactive inputs
 balance_hsa = wire(4438)
 annual_hsa_contribution = wire(4400)
-
-# UI state - track which sections are open
-details_401k_open = wire(False)
-details_roth_open = wire(False)
-details_hsa_open = wire(False)
 
 # Limits (constants)
 limit_401k = 24500.00
@@ -313,34 +308,94 @@ def update_hsa_contribution(event):
     """Handle HSA contribution with limit cap."""
     annual_hsa_contribution.value = min(parse_formatted_number(event.value), limit_hsa)
 
-# UI toggle handlers - only one section open at a time
-def toggle_401k_section():
-    was_open = details_401k_open.value
-    details_401k_open.value = not was_open
-    if not was_open:
-        details_roth_open.value = False
-        details_hsa_open.value = False
-
-def toggle_roth_section():
-    was_open = details_roth_open.value
-    details_roth_open.value = not was_open
-    if not was_open:
-        details_401k_open.value = False
-        details_hsa_open.value = False
-
-def toggle_hsa_section():
-    was_open = details_hsa_open.value
-    details_hsa_open.value = not was_open
-    if not was_open:
-        details_401k_open.value = False
-        details_roth_open.value = False
-
 ---
 <style>
     /* Smooth accordion transitions - managed by JavaScript */
+    details {
+        will-change: auto;
+    }
+
     details > div {
         overflow: hidden;
         transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+        will-change: max-height, opacity;
+    }
+
+    /* Prevent scroll jumping on mobile */
+    html {
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: auto;
+    }
+
+    /* Ensure page loads at top */
+    body {
+        scroll-behavior: auto;
+    }
+
+    /* Fix input text visibility in dark mode */
+    input[type="number"],
+    input[type="text"],
+    .percent-input,
+    .dollar-input,
+    .number-input {
+        color: #333 !important;
+        background-color: white !important;
+        -webkit-text-fill-color: #333 !important;
+    }
+
+    /* Ensure placeholder text is lighter */
+    input::placeholder {
+        color: #999 !important;
+        opacity: 1 !important;
+    }
+
+    /* Responsive layout */
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    /* Top inputs: 3 columns on desktop (Age, Retirement Age, Expected Return) */
+    .top-input-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.75rem;
+    }
+
+    .match-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    /* Mobile responsive - stack vertically */
+    @media (max-width: 768px) {
+        .main-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        /* On mobile: Age fields in 2 columns, Expected Return below */
+        .top-input-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .top-input-grid > :nth-child(3) {
+            grid-column: 1 / -1;
+        }
+
+        .match-grid {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+
+        /* Reduce chart padding on mobile */
+        canvas {
+            max-width: 100%;
+        }
     }
 </style>
 
@@ -353,13 +408,13 @@ def toggle_hsa_section():
     <h1 style="margin-bottom: 0.5rem;">Contribution Planning</h1>
     <p style="margin-bottom: 1.5rem; color: #666;">Model different contribution scenarios to optimize your retirement savings strategy.</p>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+    <div class="main-grid">
         <!-- Left Column: Input Form -->
         <div>
             <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <h2 style="margin: 0 0 1rem 0; color: #333; font-size: 1.1rem;">Your Information</h2>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div class="top-input-grid" style="margin-bottom: 1rem;">
                     <div>
                         <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
                             Current Age
@@ -369,8 +424,7 @@ def toggle_hsa_section():
                             class="number-input"
                             value={current_age}
                             @input={update_current_age}
-                            style="width: 100%; padding: 0.6rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit;"
-                            placeholder="35"
+                            style="width: 100%; padding: 0.6rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
                         />
                     </div>
                     <div>
@@ -383,38 +437,32 @@ def toggle_hsa_section():
                             value={planned_retirement_age}
                             @input={update_retirement_age}
                             style="width: 100%; padding: 0.6rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit;"
-                            placeholder="65"
                         />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
+                            Expected Return
+                        </label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <span style="position: absolute; left: 10px; color: #666;">%</span>
+                            <input
+                                type="number"
+                                class="percent-input"
+                                value={expected_investment_return}
+                                @input={update_investment_return}
+                                style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.8rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
+                                step="0.5"
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
-                        Expected Investment Return
-                    </label>
-                    <div style="position: relative; display: flex; align-items: center;">
-                        <span style="position: absolute; left: 10px; color: #666;">%</span>
-                        <input
-                            type="number"
-                            class="percent-input"
-                            value={expected_investment_return}
-                            @input={update_investment_return}
-                            style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.8rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                            placeholder="7.0"
-                            step="0.5"
-                        />
-                    </div>
-                    <div style="margin-top: 0.2rem; font-size: 0.8rem; color: #666;">
-                        Average annual return on investments
-                    </div>
-                </div>
-
-                <details open={details_401k_open} style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
-                    <summary @click={toggle_401k_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none; margin: 0;">
+                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none; margin: 0;">
                         401(k)
                     </summary>
 
-                    <div style="padding: 0 1rem 1rem 1rem;">
+                    <div style="padding: 0 1rem;">
                         <div style="border-bottom: 1px solid #f0f0f0; margin-bottom: 0.75rem; padding-bottom: 0.75rem;">
                             <div style="margin-bottom: 0.75rem;">
                                 <label style="display: block; margin-bottom: 0.4rem; color: #555; font-weight: 500; font-size: 0.9rem;">
@@ -428,7 +476,6 @@ def toggle_hsa_section():
                                         data-initial-value={annual_income}
                                         @input={update_annual_income}
                                         style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                        placeholder="83,592"
                                     />
                                 </div>
                             </div>
@@ -445,7 +492,6 @@ def toggle_hsa_section():
                                         value={expected_income_growth}
                                         @input={update_income_growth}
                                         style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.8rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                        placeholder="3.0"
                                         step="0.5"
                                     />
                                 </div>
@@ -467,7 +513,6 @@ def toggle_hsa_section():
                                     data-initial-value={balance_401k}
                                     @input={update_balance_401k}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                 />
                             </div>
                         </div>
@@ -484,7 +529,6 @@ def toggle_hsa_section():
                                     value={contribution_401k_percent}
                                     @input={update_contribution_401k}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.8rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                     step="0.5"
                                 />
                             </div>
@@ -496,7 +540,7 @@ def toggle_hsa_section():
 
                         <div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">
                             <h4 style="margin: 0 0 0.5rem 0; color: #555; font-size: 0.9rem; font-weight: 600;">Employer Match</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <div class="match-grid">
                                 <div>
                                     <label style="display: block; margin-bottom: 0.3rem; color: #666; font-weight: 500; font-size: 0.85rem;">
                                         Match %
@@ -509,7 +553,6 @@ def toggle_hsa_section():
                                             value={employer_match_percent}
                                             @input={update_employer_match_percent}
                                             style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 1.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; font-family: inherit; background: white; margin: 0;"
-                                            placeholder="50"
                                             step="1"
                                         />
                                     </div>
@@ -526,7 +569,6 @@ def toggle_hsa_section():
                                             value={employer_match_limit}
                                             @input={update_employer_match_limit}
                                             style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 1.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; font-family: inherit; background: white; margin: 0;"
-                                            placeholder="6"
                                             step="0.5"
                                         />
                                     </div>
@@ -539,12 +581,12 @@ def toggle_hsa_section():
                     </div>
                 </details>
 
-                <details open={details_roth_open} style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
-                    <summary @click={toggle_roth_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
+                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none; margin: 0;">
                         Roth IRA
                     </summary>
 
-                    <div style="padding: 0 1rem 1rem 1rem;">
+                    <div style="padding: 0 1rem;">
                         <div style="margin-bottom: 0.75rem;">
                             <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
                                 Current Balance
@@ -557,7 +599,6 @@ def toggle_hsa_section():
                                     data-initial-value={balance_roth}
                                     @input={update_balance_roth}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                 />
                             </div>
                         </div>
@@ -574,7 +615,6 @@ def toggle_hsa_section():
                                     data-initial-value={annual_roth_contribution}
                                     @input={update_roth_contribution}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                 />
                             </div>
                             {$if annual_roth_contribution.value > 0}
@@ -584,12 +624,12 @@ def toggle_hsa_section():
                     </div>
                 </details>
 
-                <details open={details_hsa_open} style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
-                    <summary @click={toggle_hsa_section} style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none;">
+                <details style="border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #333; font-size: 1rem; padding: 1rem; display: block; list-style: none; margin: 0;">
                         HSA (Health Savings Account)
                     </summary>
 
-                    <div style="padding: 0 1rem 1rem 1rem;">
+                    <div style="padding: 0 1rem;">
                         <div style="margin-bottom: 0.75rem;">
                             <label style="display: block; margin-bottom: 0.25rem; color: #555; font-weight: 500; font-size: 0.9rem;">
                                 Current Balance
@@ -602,7 +642,6 @@ def toggle_hsa_section():
                                     data-initial-value={balance_hsa}
                                     @input={update_balance_hsa}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                 />
                             </div>
                         </div>
@@ -619,7 +658,6 @@ def toggle_hsa_section():
                                     data-initial-value={annual_hsa_contribution}
                                     @input={update_hsa_contribution}
                                     style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 1.5rem; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 0.95rem; font-family: inherit; margin: 0;"
-                                    placeholder="0"
                                 />
                             </div>
                             {$if annual_hsa_contribution.value > 0}
@@ -654,9 +692,8 @@ def toggle_hsa_section():
                         <div style="font-size: 0.85rem; opacity: 0.9;">Total Savings Rate</div>
                         <div style="font-size: 2rem; font-weight: bold; margin: 0.25rem 0;">{'{:.1f}'.format(((calc_annual_401k_contribution() + annual_roth_contribution.value + annual_hsa_contribution.value + calc_annual_employer_match()) / annual_income.value * 100) if annual_income.value > 0 else 0)}%</div>
                         <div style="font-size: 0.75rem; opacity: 0.85; line-height: 1.4;">
-                            Pre-tax: {'{:.1f}'.format(((calc_annual_401k_contribution() + annual_hsa_contribution.value) / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
-                            Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}% •
-                            Employer Match: {'{:.1f}'.format((calc_annual_employer_match() / annual_income.value * 100) if annual_income.value > 0 else 0)}%
+                            Pre-tax: {'{:.1f}'.format(((calc_annual_401k_contribution() + calc_annual_employer_match() + annual_hsa_contribution.value) / annual_income.value * 100) if annual_income.value > 0 else 0)}% • 
+                            Post-tax: {'{:.1f}'.format((annual_roth_contribution.value / annual_income.value * 100) if annual_income.value > 0 else 0)}%
                         </div>
                     </div>
                 </div>
@@ -707,7 +744,7 @@ def toggle_hsa_section():
 
     <div $permanent id="chart-container" data-chart={calc_chart_data} style="margin-top: 3rem;">
         <h2 style="margin-bottom: 1rem;">Savings Growth Over Time</h2>
-        <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div style="background: white; padding: 0.75rem 1rem 0.75rem 0.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <div style="position: relative; height: 500px;">
                 <canvas id="contributionsChart"></canvas>
             </div>
@@ -732,6 +769,17 @@ def toggle_hsa_section():
             const chartData = JSON.parse(container.dataset.chart);
 
             const ctx = document.getElementById('contributionsChart').getContext('2d');
+            // Helper function to format large numbers
+            const formatCurrency = (value) => {
+                if (value >= 1000000) {
+                    return '$' + (value / 1000000).toFixed(1) + 'M';
+                } else if (value >= 1000) {
+                    return '$' + (value / 1000).toFixed(0) + 'K';
+                } else {
+                    return '$' + value.toFixed(0);
+                }
+            };
+
             const chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -798,6 +846,14 @@ def toggle_hsa_section():
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 0,
+                        right: 10,
+                        top: 0,
+                        bottom: 0
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false
@@ -847,11 +903,10 @@ def toggle_hsa_section():
                         },
                         ticks: {
                             callback: function(value) {
-                                return '$' + value.toLocaleString('en-US', {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                });
-                            }
+                                return formatCurrency(value);
+                            },
+                            padding: 5,
+                            maxTicksLimit: 6
                         },
                         grid: {
                             color: 'rgba(0, 0, 0, 0.1)'
@@ -881,8 +936,9 @@ def toggle_hsa_section():
                         chart.data.labels = newData.years;
                         chart.data.datasets[0].data = newData.yearly_401k;
                         chart.data.datasets[1].data = newData.yearly_roth;
-                        chart.data.datasets[2].data = newData.yearly_total;
-                        chart.data.datasets[3].data = newData.yearly_projected;
+                        chart.data.datasets[2].data = newData.yearly_hsa;
+                        chart.data.datasets[3].data = newData.yearly_total;
+                        chart.data.datasets[4].data = newData.yearly_projected;
 
                         // Refresh chart
                         chart.update();
@@ -985,64 +1041,76 @@ def toggle_hsa_section():
         addClearOnFocusBehavior(document.querySelectorAll('.number-input'));
         addDollarInputBehavior(dollarInputs);
 
-        // Smooth accordion animations
-        document.querySelectorAll('details').forEach(details => {
+        // Smooth accordion animations with manual control
+        const allDetails = document.querySelectorAll('details');
+
+        allDetails.forEach(details => {
+            const summary = details.querySelector('summary');
             const content = details.querySelector('div');
-            if (!content) return;
+            if (!content || !summary) return;
 
-            // Store the actual height
-            let actualHeight = 0;
+            // Set initial styles
+            content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+            content.style.overflow = 'hidden';
 
-            // Measure height when opening
-            const measureHeight = () => {
-                if (details.open) {
-                    content.style.maxHeight = 'none';
-                    actualHeight = content.scrollHeight;
-                    content.style.maxHeight = '0px';
-                    // Force reflow
-                    content.offsetHeight;
-                    requestAnimationFrame(() => {
-                        content.style.maxHeight = actualHeight + 'px';
-                    });
-                }
-            };
-
-            // Watch for open attribute changes
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
-                        if (details.open) {
-                            // Opening
-                            content.style.maxHeight = '0px';
-                            content.style.opacity = '0';
-                            requestAnimationFrame(() => {
-                                content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                                actualHeight = content.scrollHeight;
-                                content.style.maxHeight = actualHeight + 'px';
-                                content.style.opacity = '1';
-                            });
-                        } else {
-                            // Closing
-                            content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                            content.style.maxHeight = content.scrollHeight + 'px';
-                            requestAnimationFrame(() => {
-                                content.style.maxHeight = '0px';
-                                content.style.opacity = '0';
-                            });
-                        }
-                    }
-                });
-            });
-
-            observer.observe(details, { attributes: true });
-
-            // Initial setup for open details
+            // Initial setup
             if (details.open) {
-                content.style.maxHeight = 'none';
+                content.style.maxHeight = content.scrollHeight + 'px';
+                content.style.opacity = '1';
             } else {
                 content.style.maxHeight = '0px';
                 content.style.opacity = '0';
             }
+
+            // Intercept clicks to animate before state changes
+            summary.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const isOpen = details.hasAttribute('open');
+
+                if (!isOpen) {
+                    // Close all other accordions with animation
+                    allDetails.forEach(other => {
+                        if (other !== details && other.hasAttribute('open')) {
+                            const otherContent = other.querySelector('div');
+                            if (otherContent) {
+                                // Get the current computed height instead of scrollHeight
+                                const currentHeight = window.getComputedStyle(otherContent).height;
+                                otherContent.style.maxHeight = currentHeight;
+                                otherContent.offsetHeight; // Force reflow
+                                setTimeout(() => {
+                                    otherContent.style.maxHeight = '0px';
+                                    otherContent.style.opacity = '0';
+                                }, 10);
+                                setTimeout(() => other.removeAttribute('open'), 310);
+                            }
+                        }
+                    });
+
+                    // Open this accordion
+                    details.setAttribute('open', '');
+                    const height = content.scrollHeight;
+                    content.style.maxHeight = '0px';
+                    content.style.opacity = '0';
+                    content.offsetHeight;
+                    setTimeout(() => {
+                        content.style.maxHeight = height + 'px';
+                        content.style.opacity = '1';
+                    }, 10);
+                } else {
+                    // Close this accordion
+                    // Get the current computed height instead of scrollHeight to prevent snapping
+                    const currentHeight = window.getComputedStyle(content).height;
+                    content.style.maxHeight = currentHeight;
+                    content.offsetHeight; // Force reflow
+                    setTimeout(() => {
+                        content.style.maxHeight = '0px';
+                        content.style.opacity = '0';
+                    }, 10);
+                    setTimeout(() => details.removeAttribute('open'), 310);
+                }
+            }, true);
         });
     });
 </script>
