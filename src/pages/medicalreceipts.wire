@@ -242,34 +242,23 @@ def sort_by(column):
 
 def load_receipts_from_storage(event):
     """Load receipts from localStorage on page mount"""
-    print("load_receipts_from_storage called")
-    print(f"Event type: {type(event)}")
-    print(f"Event has 'value': {hasattr(event, 'value')}")
-
     try:
         # Try to get the value from the event
         json_data = None
         if hasattr(event, 'value') and event.value:
             json_data = event.value
-            print(f"Using event.value, length: {len(json_data)}")
         elif hasattr(event, 'target') and hasattr(event.target, 'value') and event.target.value:
             json_data = event.target.value
-            print(f"Using event.target.value, length: {len(json_data)}")
         else:
-            print("No value found in event")
             raise ValueError("No data in event")
 
         data = json.loads(json_data)
         receipts_list = data.get("receipts", [])
-        print(f"Loaded {len(receipts_list)} receipts from localStorage")
 
         # Clear and update the list (WireList doesn't allow direct .value assignment)
         receipts.value.clear()
         receipts.value.extend(receipts_list)
-
-        print(f"Successfully loaded {len(receipts.value)} receipts")
-    except Exception as e:
-        print(f"Error loading from localStorage: {e}. Loading sample data.")
+    except:
         # Initialize with sample data if localStorage is empty
         receipts.value.clear()
         receipts.value.extend([
@@ -721,7 +710,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
                     const data = storageContainer.dataset.state;
                     localStorage.setItem('medical_receipts_data', data);
-                    console.log('Saved to localStorage');
                 }
             });
         });
@@ -730,16 +718,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // LOAD: Read from localStorage on page load
     const savedData = localStorage.getItem('medical_receipts_data');
-    console.log('Checking localStorage:', savedData ? 'Data found' : 'No data');
-    console.log('receiptsLoader element:', receiptsLoader ? 'Found' : 'Not found');
 
     if (savedData && receiptsLoader) {
-        console.log('Loading from localStorage, data length:', savedData.length);
-
         // Wait a bit for PyWire to initialize
         setTimeout(() => {
-            console.log('Dispatching localStorage load event...');
-
             // Set the input value directly
             receiptsLoader.value = savedData;
 
@@ -754,12 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             receiptsLoader.dispatchEvent(inputEvent);
-            console.log('Event dispatched to receiptsLoader');
         }, 100);
-    } else if (!savedData) {
-        console.log('No saved data in localStorage');
-    } else if (!receiptsLoader) {
-        console.error('receiptsLoader element not found!');
     }
 
 });
@@ -769,13 +746,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('change', async function(e) {
     if (e.target && e.target.id === 'receipt-image-upload') {
-        console.log("File input change event triggered");
         const file = e.target.files[0];
-        if (!file) {
-            console.log("No file selected");
-            return;
-        }
-        console.log("File selected:", file.name, file.size, file.type);
+        if (!file) return;
 
         // Check size
         if (file.size > 2 * 1024 * 1024) {
@@ -802,17 +774,12 @@ document.addEventListener('change', async function(e) {
                 thumbnail: thumbnail
             });
 
-            console.log('Dispatching compressed image data to PyWire');
-
             // Dispatch to hidden input which triggers PyWire handler
             const hiddenInput = document.getElementById('file-upload-data');
             if (hiddenInput) {
                 const inputEvent = new Event('input', { bubbles: true });
                 Object.defineProperty(inputEvent, 'value', { value: data, writable: false });
                 hiddenInput.dispatchEvent(inputEvent);
-                console.log('Image compressed and uploaded');
-            } else {
-                console.error('Hidden input file-upload-data not found');
             }
 
             // Clear the file input
