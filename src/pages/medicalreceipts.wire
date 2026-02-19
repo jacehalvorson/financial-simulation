@@ -36,6 +36,7 @@ sort_direction = wire("desc")
 user_tax_bracket = wire(22.0)
 storage_warning = wire(False)
 form_error = wire("")
+storage_json = wire("{}")
 
 # ===== EVENT HANDLER FACTORIES =====
 
@@ -130,6 +131,9 @@ def save_receipt():
     # Append to list
     receipts.value.append(new_receipt)
 
+    # Update localStorage
+    update_storage()
+
     # Close modal
     close_modal()
 
@@ -184,6 +188,9 @@ def update_receipt():
     # Replace in list (use index assignment instead of .value reassignment)
     receipts.value[edit_index.value] = updated_receipt
 
+    # Update localStorage
+    update_storage()
+
     # Close modal
     close_modal()
 
@@ -198,12 +205,16 @@ def delete_receipt(index):
     """Delete receipt from list"""
     # Use del to remove item from WireList
     del receipts.value[index]
+    # Update localStorage
+    update_storage()
 
 def toggle_reimbursed(index):
     """Toggle reimbursement status"""
     # Modify item in place (triggers reactivity)
     receipts.value[index]["reimbursed"] = not receipts.value[index].get("reimbursed", False)
     receipts.value[index]["updated_at"] = datetime.now().isoformat()
+    # Update localStorage
+    update_storage()
 
 # ===== IMAGE HANDLING =====
 
@@ -258,6 +269,9 @@ def load_receipts_from_storage(event):
         # Clear and update the list (WireList doesn't allow direct .value assignment)
         receipts.value.clear()
         receipts.value.extend(receipts_list)
+
+        # Update storage wire to trigger save
+        update_storage()
     except:
         # Initialize with sample data if localStorage is empty
         receipts.value.clear()
@@ -306,6 +320,9 @@ def load_receipts_from_storage(event):
             }
         ])
 
+        # Update storage wire to trigger save
+        update_storage()
+
 # ===== DERIVED COMPUTATIONS =====
 
 def filtered_sorted_receipts():
@@ -338,13 +355,13 @@ def filtered_sorted_receipts():
 
     return result
 
-def receipts_json():
-    """Serialize receipts to JSON for localStorage"""
+def update_storage():
+    """Update the storage JSON wire - triggers localStorage save"""
     storage_data = {
         "version": "1.1",
-        "receipts": receipts.value
+        "receipts": list(receipts.value)
     }
-    return json.dumps(storage_data)
+    storage_json.value = json.dumps(storage_data)
 
 # Calculation helpers
 
@@ -385,7 +402,7 @@ def get_reimbursed_percent():
 <input id="file-upload-data" @input={handle_file_upload} style="display:none" />
 
 <!-- localStorage persistence bridge -->
-<div $permanent id="storage-container" data-state={receipts_json()} style="display:none"></div>
+<div id="storage-container" data-state={storage_json} style="display:none"></div>
 
 <section>
     <div style="margin-bottom: 2rem;">
