@@ -106,10 +106,6 @@ def save_receipt():
         form_error.value = "Please fill in all required fields (Date, Provider, and Description)"
         return
 
-    if form_amount.value <= 0:
-        form_error.value = "Amount must be greater than $0"
-        return
-
     # Clear any previous errors
     form_error.value = ""
 
@@ -162,10 +158,6 @@ def update_receipt():
     # Validate
     if not form_date.value or not form_provider.value or not form_description.value:
         form_error.value = "Please fill in all required fields (Date, Provider, and Description)"
-        return
-
-    if form_amount.value <= 0:
-        form_error.value = "Amount must be greater than $0"
         return
 
     # Clear any previous errors
@@ -553,12 +545,14 @@ def isReceiptsEmpty():
                 </tbody>
             </table>
 
-            <div $if={isReceiptsEmpty()} style="padding: 3rem; text-align: center; color: var(--pico-muted-color, #666); background: var(--pico-card-background-color, #fff);">
-                <p style="font-size: 1.2rem; margin-bottom: 1rem;">No receipts found</p>
-                <p style="margin-bottom: 1.5rem;">Get started by adding your first medical receipt</p>
-                <button @click={open_add_modal} style="padding: 0.75rem 1.5rem; background: transparent; border: 1.5px solid #5568c0; color: #5568c0; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem;">
-                    ➕ Add Your First Receipt
-                </button>
+            <div $if={isReceiptsEmpty()}>
+                <div style="padding: 3rem; text-align: center; color: var(--pico-muted-color, #666); background: var(--pico-card-background-color, #fff);">
+                    <p style="font-size: 1.2rem; margin-bottom: 1rem;">No receipts found</p>
+                    <p style="margin-bottom: 1.5rem;">Get started by adding your first medical receipt</p>
+                    <button @click={open_add_modal} style="padding: 0.75rem 1.5rem; background: transparent; border: 1.5px solid #5568c0; color: #5568c0; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem;">
+                        ➕ Add Your First Receipt
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -605,17 +599,31 @@ def isReceiptsEmpty():
         </div>
 
         <form @submit.prevent={handle_form_submit}>
-            <div style="margin-bottom: 1rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Date *</label>
-                <input
-                    type="date"
-                    value={form_date}
-                    @input={update_form_date}
-                    required
-                />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Date *</label>
+                    <input
+                        type="date"
+                        value={form_date}
+                        @input={update_form_date}
+                        required
+                    />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Category *</label>
+                    <select
+                        value={form_category}
+                        @change={update_form_category}
+                    >
+                        <option value="Medical">Medical</option>
+                        <option value="Dental">Dental</option>
+                        <option value="Vision">Vision</option>
+                        <option value="Prescription">Prescription</option>
+                    </select>
+                </div>
             </div>
 
-            <div style="margin-bottom: 1rem;">
+            <div>
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Provider *</label>
                 <input
                     type="text"
@@ -625,19 +633,6 @@ def isReceiptsEmpty():
                     placeholder="e.g., City General Hospital"
                     required
                 />
-            </div>
-
-            <div style="margin-bottom: 1rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Category *</label>
-                <select
-                    value={form_category}
-                    @change={update_form_category}
-                >
-                    <option value="Medical">Medical</option>
-                    <option value="Dental">Dental</option>
-                    <option value="Vision">Vision</option>
-                    <option value="Prescription">Prescription</option>
-                </select>
             </div>
 
             <div style="margin-bottom: 1rem;">
@@ -656,16 +651,15 @@ def isReceiptsEmpty():
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--pico-color, inherit);">Amount ($) *</label>
                 <input
                     type="number"
-                    class="form-input-magic"
                     value={form_amount}
                     @input={update_form_amount}
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     required
                 />
             </div>
 
-            <div style="margin-bottom: 1rem;">
+            <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
                 <label style="display: flex; align-items: center; cursor: pointer;">
                     <input
                         type="checkbox"
@@ -675,9 +669,6 @@ def isReceiptsEmpty():
                     />
                     <span style="font-weight: 500; color: var(--pico-color, inherit);">HSA Eligible</span>
                 </label>
-            </div>
-
-            <div style="margin-bottom: 1rem;">
                 <label style="display: flex; align-items: center; cursor: pointer;">
                     <input
                         type="checkbox"
