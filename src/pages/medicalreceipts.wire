@@ -10,7 +10,7 @@ import uuid
 receipts = wire([])
 
 # Form state - individual scalars for each field
-form_date = wire("")
+form_date = wire(datetime.now().strftime("%Y-%m-%d"))
 form_provider = wire("")
 form_category = wire("Medical")
 form_description = wire("")
@@ -77,11 +77,20 @@ update_filter_status = make_text_handler(filter_status)
 # ===== MODAL OPERATIONS =====
 
 def open_add_modal():
-    """Open modal in add mode with empty form"""
+    """Open modal in add mode — preserves any unsaved form values from a prior cancel"""
     edit_mode.value = False
     edit_index.value = -1
     form_error.value = ""
-    # Reset form fields
+    show_modal.value = True
+
+def close_modal():
+    """Close modal"""
+    show_modal.value = False
+    edit_mode.value = False
+    edit_index.value = -1
+
+def reset_form():
+    """Reset form fields to defaults — called only after a successful submit"""
     form_date.value = datetime.now().strftime("%Y-%m-%d")
     form_provider.value = ""
     form_category.value = "Medical"
@@ -92,13 +101,7 @@ def open_add_modal():
     form_image_base64.value = ""
     form_image_thumbnail.value = ""
     form_image_filename.value = ""
-    show_modal.value = True
-
-def close_modal():
-    """Close modal and reset state"""
-    show_modal.value = False
-    edit_mode.value = False
-    edit_index.value = -1
+    form_error.value = ""
 
 # ===== CRUD OPERATIONS =====
 
@@ -135,7 +138,8 @@ def save_receipt():
     # Update localStorage
     update_storage()
 
-    # Close modal
+    # Reset form and close modal
+    reset_form()
     close_modal()
 
 def edit_receipt(index):
@@ -188,7 +192,8 @@ def update_receipt():
     # Update localStorage
     update_storage()
 
-    # Close modal
+    # Reset form and close modal
+    reset_form()
     close_modal()
 
 def handle_form_submit():
@@ -443,31 +448,31 @@ def isReceiptsEmpty():
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 0 0 2rem 0; align-items: start;">
         <div style="padding: 1.5rem; background: linear-gradient(135deg, #4e62c8 0%, #8030b8 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;">
             <div style="font-size: 0.9rem; opacity: 0.9; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Total Medical Expenses</div>
-            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(calc_total_expenses())}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(calc_total_expenses())}</div>
             <div style="font-size: 0.85rem; opacity: 0.8; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">{len(receipts)} receipts</div>
         </div>
 
         <div style="padding: 1.5rem; background: linear-gradient(135deg, #28a860 0%, #108898 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;">
             <div style="font-size: 0.9rem; opacity: 0.9; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Reimbursed</div>
-            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(calc_total_reimbursed())}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(calc_total_reimbursed())}</div>
             <div style="font-size: 0.85rem; opacity: 0.8; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">{get_reimbursed_percent()}% of total</div>
         </div>
 
         <div style="padding: 1.5rem; background: linear-gradient(135deg, #c038a8 0%, #b82040 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;">
             <div style="font-size: 0.9rem; opacity: 0.9; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Pending</div>
-            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(calc_total_pending())}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(calc_total_pending())}</div>
             <div style="font-size: 0.85rem; opacity: 0.8; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Available to claim</div>
         </div>
 
         <div style="padding: 1.5rem; background: linear-gradient(135deg, #2868cc 0%, #0898a8 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;">
             <div style="font-size: 0.9rem; opacity: 0.9; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Earnings (Est.)</div>
-            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(calc_earnings_while_pending())}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(calc_earnings_while_pending())}</div>
             <div style="font-size: 0.85rem; opacity: 0.8; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">At {hsa_annual_return}% while pending</div>
         </div>
 
         <div style="padding: 1.5rem; background: linear-gradient(135deg, #b05878 0%, #b08820 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;">
             <div style="font-size: 0.9rem; opacity: 0.9; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">Tax Savings (Est.)</div>
-            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.2f}'.format(calc_tax_savings())}</div>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0;">${'{:,.0f}'.format(calc_tax_savings())}</div>
             <div style="font-size: 0.85rem; opacity: 0.8; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(to right, white 72%, transparent 100%); -webkit-mask-image: linear-gradient(to right, white 72%, transparent 100%);">At {user_tax_bracket}% tax bracket</div>
         </div>
     </div>
@@ -589,7 +594,7 @@ def isReceiptsEmpty():
 </style>
 
 <!-- Modal Dialog -->
-<div class="modal-backdrop" style="display: {'flex' if show_modal else 'none'}; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center;" onclick="if(event.target===this)window._closeModal();">
+<div class="modal-backdrop" style="display: {'flex' if show_modal else 'none'}; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center;" onmousedown="if(event.target===this)this.dataset.backdropDown='1';" onclick="if(event.target===this&&this.dataset.backdropDown){window._closeModal();}delete this.dataset.backdropDown;">
     <div class="modal-card" style="background: var(--pico-card-background-color, white); padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border-radius: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.45); position: relative;">
         <button id="modal-close-x" @click={close_modal} style="display:none;"></button>
         <button onclick="window._closeModal();" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #666; line-height: 1; padding: 0.25rem 0.5rem;">&times;</button>
