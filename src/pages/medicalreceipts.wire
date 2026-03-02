@@ -7,7 +7,7 @@ import uuid
 # ===== REACTIVE STATE =====
 
 # Receipt list - main data store
-receipts = wire([])
+receipts = wire({})
 
 # Form state - individual scalars for each field
 form_date = wire(datetime.now().strftime("%Y-%m-%d"))
@@ -24,7 +24,7 @@ form_image_filename = wire("")
 # UI state
 show_modal = wire(False)
 edit_mode = wire(False)
-edit_index = wire(-1)
+edit_id = wire("")
 
 # Filter/sort state
 filter_category = wire("All")
@@ -79,7 +79,6 @@ update_filter_status = make_text_handler(filter_status)
 def open_add_modal():
     """Open modal in add mode — preserves any unsaved form values from a prior cancel"""
     edit_mode.value = False
-    edit_index.value = -1
     form_error.value = ""
     show_modal.value = True
 
@@ -87,7 +86,6 @@ def close_modal():
     """Close modal"""
     show_modal.value = False
     edit_mode.value = False
-    edit_index.value = -1
 
 def reset_form():
     """Reset form fields to defaults — called only after a successful submit"""
@@ -116,8 +114,9 @@ def save_receipt():
     form_error.value = ""
 
     # Create new receipt
+    id = str(uuid.uuid4())
     new_receipt = {
-        "id": str(uuid.uuid4()),
+        "id": id,
         "date": form_date.value,
         "provider": form_provider.value,
         "category": form_category.value,
@@ -132,8 +131,8 @@ def save_receipt():
         "reimbursed_at": datetime.now().isoformat() if form_reimbursed.value else None
     }
 
-    # Append to list
-    receipts.value.append(new_receipt)
+    # Add to dictionary
+    receipts.value.update({id: new_receipt})
 
     # Update localStorage
     update_storage()
@@ -142,23 +141,21 @@ def save_receipt():
     reset_form()
     close_modal()
 
-def edit_receipt(index):
+def edit_receipt(receipt):
     """Open edit modal for the receipt at the given list index"""
-    if 0 <= index < len(receipts.value):
-        receipt = receipts.value[index]
-        form_error.value = ""
-        form_date.value = receipt.get("date", "")
-        form_provider.value = receipt.get("provider", "")
-        form_category.value = receipt.get("category", "Medical")
-        form_description.value = receipt.get("description", "")
-        form_amount.value = receipt.get("amount", 0.0)
-        form_hsa_eligible.value = receipt.get("hsa_eligible", True)
-        form_reimbursed.value = receipt.get("reimbursed", False)
-        form_image_base64.value = receipt.get("image", "")
-        form_image_thumbnail.value = receipt.get("thumbnail", "")
-        edit_index.value = index
-        edit_mode.value = True
-        show_modal.value = True
+    form_error.value = ""
+    form_date.value = receipt.get("date", "")
+    form_provider.value = receipt.get("provider", "")
+    form_category.value = receipt.get("category", "Medical")
+    form_description.value = receipt.get("description", "")
+    form_amount.value = receipt.get("amount", 0.0)
+    form_hsa_eligible.value = receipt.get("hsa_eligible", True)
+    form_reimbursed.value = receipt.get("reimbursed", False)
+    form_image_base64.value = receipt.get("image", "")
+    form_image_thumbnail.value = receipt.get("thumbnail", "")
+    edit_id.value = receipt.get("id", "")
+    edit_mode.value = True
+    show_modal.value = True
 
 def update_receipt():
     """Update existing receipt"""
@@ -170,9 +167,14 @@ def update_receipt():
     # Clear any previous errors
     form_error.value = ""
 
-    # Create updated receipt
-    updated_receipt = {
-        "id": receipts.value[edit_index.value].get("id", str(uuid.uuid4())),
+    receipt = receipts.value.get(edit_id.value)
+    if not receipt:
+        form_error.value = "Receipt not found."
+        return
+
+    # Replace in dictionary
+    receipts.value[edit_id.value] = {
+        "id": edit_id.value,
         "date": form_date.value,
         "provider": form_provider.value,
         "category": form_category.value,
@@ -182,12 +184,9 @@ def update_receipt():
         "reimbursed": form_reimbursed.value,
         "image": form_image_base64.value,
         "thumbnail": form_image_thumbnail.value,
-        "created_at": receipts.value[edit_index.value].get("created_at", datetime.now().isoformat()),
+        "created_at": receipt.get("created_at", datetime.now().isoformat()),
         "updated_at": datetime.now().isoformat()
     }
-
-    # Replace in list (use index assignment instead of .value reassignment)
-    receipts.value[edit_index.value] = updated_receipt
 
     # Update localStorage
     update_storage()
@@ -203,25 +202,25 @@ def handle_form_submit():
     else:
         save_receipt()
 
-def delete_receipt(index):
+def delete_receipt(receipt_id):
     """Delete receipt from list"""
-    # Use del to remove item from WireList
-    del receipts.value[index]
-    # Update localStorage
+    receipts.value.pop(receipt_id)
     update_storage()
 
-def toggle_reimbursed(index):
+def toggle_reimbursed(receipt):
     """Toggle reimbursement status"""
-    # Modify item in place (triggers reactivity)
-    if not receipts.value or index < 0 or index >= len(receipts.value) or not receipts.value[index].get("hsa_eligible", True):
+    id = receipt.get("id", "")
+    if not receipts.value.get(id) or not receipt.get("hsa_eligible", True):
         return
     now = datetime.now().isoformat()
-    receipts.value[index]["reimbursed"] = not receipts.value[index].get("reimbursed", False)
-    if receipts.value[index]["reimbursed"]:
-        receipts.value[index]["reimbursed_at"] = now
-    else:
-        receipts.value[index]["reimbursed_at"] = None
-    receipts.value[index]["updated_at"] = now
+    reimbursed = receipt.get("reimbursed", False)
+    updated_receipt = receipt.copy()
+    if not updated_receipt or len(updated_receipt) == 0:
+        return
+    updated_receipt["reimbursed"] = not reimbursed
+    updated_receipt["reimbursed_at"] = now if not reimbursed else None
+    updated_receipt["updated_at"] = now
+    receipts.value.update({id: updated_receipt})
     # Update localStorage
     update_storage()
 
@@ -273,64 +272,60 @@ def load_receipts_from_storage(event):
             raise ValueError("No data in event")
 
         data = json.loads(json_data)
-        receipts_list = data.get("receipts", [])
+        receipts_list = data.get("receipts", {})
 
         # Clear and update the list (WireList doesn't allow direct .value assignment)
-        receipts.value.clear()
-        receipts.value.extend(receipts_list)
+        receipts.value.update(receipts_list)
     except:
         # Initialize with sample data if localStorage is empty
-        receipts.value.clear()
-        receipts.value.extend([
+        receipts.value.update(
             {
-                "id": str(uuid.uuid4()),
-                "date": "2024-01-15",
-                "provider": "City General Hospital",
-                "category": "Medical",
-                "description": "Annual physical exam",
-                "amount": 250.00,
-                "hsa_eligible": True,
-                "reimbursed": True,
-                "image": "",
-                "thumbnail": "",
-                "created_at": "2024-01-15T10:00:00",
-                "updated_at": "2024-01-15T10:00:00"
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "date": "2024-02-03",
-                "provider": "Vision Center",
-                "category": "Vision",
-                "description": "Eye exam and prescription glasses",
-                "amount": 385.00,
-                "hsa_eligible": True,
-                "reimbursed": False,
-                "image": "",
-                "thumbnail": "",
-                "created_at": "2024-02-03T14:30:00",
-                "updated_at": "2024-02-03T14:30:00"
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "date": "2024-03-20",
-                "provider": "Downtown Dental",
-                "category": "Dental",
-                "description": "Teeth cleaning and checkup",
-                "amount": 175.00,
-                "hsa_eligible": True,
-                "reimbursed": True,
-                "image": "",
-                "thumbnail": "",
-                "created_at": "2024-03-20T09:00:00",
-                "updated_at": "2024-03-20T09:00:00"
-            }
-        ])
+                str(uuid.uuid4()): {
+                    "date": "2024-01-15",
+                    "provider": "City General Hospital",
+                    "category": "Medical",
+                    "description": "Annual physical exam",
+                    "amount": 250.00,
+                    "hsa_eligible": True,
+                    "reimbursed": True,
+                    "image": "",
+                    "thumbnail": "",
+                    "created_at": "2024-01-15T10:00:00",
+                    "updated_at": "2024-01-15T10:00:00"
+                },
+                str(uuid.uuid4()): {
+                    "date": "2024-02-03",
+                    "provider": "Vision Center",
+                    "category": "Vision",
+                    "description": "Eye exam and prescription glasses",
+                    "amount": 385.00,
+                    "hsa_eligible": True,
+                    "reimbursed": False,
+                    "image": "",
+                    "thumbnail": "",
+                    "created_at": "2024-02-03T14:30:00",
+                    "updated_at": "2024-02-03T14:30:00"
+                },
+                str(uuid.uuid4()): {
+                    "date": "2024-03-20",
+                    "provider": "Downtown Dental",
+                    "category": "Dental",
+                    "description": "Teeth cleaning and checkup",
+                    "amount": 175.00,
+                    "hsa_eligible": True,
+                    "reimbursed": True,
+                    "image": "",
+                    "thumbnail": "",
+                    "created_at": "2024-03-20T09:00:00",
+                    "updated_at": "2024-03-20T09:00:00"
+                }
+            })
 
 # ===== DERIVED COMPUTATIONS =====
 
 def filtered_sorted_receipts():
     """Apply filters and sorting to receipts"""
-    result = receipts.value.copy()
+    result = receipts.value.values()
 
     # Filter by category
     if filter_category.value != "All":
@@ -363,7 +358,7 @@ def filtered_sorted_receipts():
 def update_storage():
     """Update the storage JSON wire - triggers localStorage save"""
     storage_data = {
-        "version": "1.2",
+        "version": "2.0",
         "receipts": receipts.value
     }
     storage_json.value = json.dumps(storage_data)
@@ -371,16 +366,16 @@ def update_storage():
 # Calculation helpers
 
 def calc_total_expenses():
-    return sum(r.get("amount", 0) for r in receipts.value)
+    return sum(r.get("amount", 0) for _, r in receipts.value.items())
 
 def calc_total_reimbursed():
-    return sum(r.get("amount", 0) for r in receipts.value if r.get("reimbursed", False))
+    return sum(r.get("amount", 0) for _, r in receipts.value.items() if r.get("reimbursed", False))
 
 def calc_total_pending():
-    return sum(r.get("amount", 0) for r in receipts.value if not r.get("reimbursed", False))
+    return sum(r.get("amount", 0) for _, r in receipts.value.items() if not r.get("reimbursed", False))
 
 def calc_hsa_eligible():
-    return sum(r.get("amount", 0) for r in receipts.value if r.get("hsa_eligible", True))
+    return sum(r.get("amount", 0) for _, r in receipts.value.items() if r.get("hsa_eligible", True))
 
 def calc_earnings_while_pending():
     """Compound earnings on HSA-eligible receipts.
@@ -391,7 +386,7 @@ def calc_earnings_while_pending():
     today = datetime.now().date()
     daily_rate = (1 + hsa_annual_return.value / 100.0) ** (1 / 365.25) - 1
     total = 0.0
-    for r in receipts.value:
+    for _, r in receipts.value.items():
         if not r.get("hsa_eligible", True):
             continue
         amount = r.get("amount", 0)
@@ -402,7 +397,7 @@ def calc_earnings_while_pending():
             else:
                 end_date = today
             days = max(0, (end_date - receipt_date).days)
-            total += amount * ((1 + daily_rate) ** days - 1)
+            total += amount * (((1 + daily_rate) ** days) - 1)
         except:
             pass
     return total
@@ -532,7 +527,7 @@ def isReceiptsEmpty():
                         <td style="padding: 1rem; color: var(--pico-muted-color, #666);">{receipt.get('description', '')}</td>
                         <td style="padding: 1rem; text-align: right; color: var(--pico-color, #212529); font-weight: 600;">${'{:,.2f}'.format(receipt.get('amount', 0))}</td>
                         <td style="padding: 1rem; text-align: center;">
-                            <span @click={toggle_reimbursed(i)} style="padding: 0.25rem 0.75rem; background: transparent; border: 1.5px solid {'#3d7a50' if receipt.get('reimbursed') else '#a06e18'}; color: {'#3d7a50' if receipt.get('reimbursed') else '#a06e18'}; border-radius: 12px; font-size: 0.85rem; font-weight: 500; cursor: pointer;">
+                            <span @click={toggle_reimbursed(receipt)} style="padding: 0.25rem 0.75rem; background: transparent; border: 1.5px solid {'#3d7a50' if receipt.get('reimbursed') else '#a06e18'}; color: {'#3d7a50' if receipt.get('reimbursed') else '#a06e18'}; border-radius: 12px; font-size: 0.85rem; font-weight: 500; cursor: pointer;">
                                 {'✓ Reimbursed' if receipt.get('reimbursed') else '⏳ Pending'}
                             </span>
                         </td>
@@ -542,10 +537,10 @@ def isReceiptsEmpty():
                             </span></span>
                         </td>
                         <td style="padding: 1rem; text-align: center;">
-                            <button @click={edit_receipt(i)} style="padding: 0.25rem 0.75rem; background: #5568c0; border: 1.5px solid #5568c0; color: white; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; font-size: 0.875rem;">
+                            <button @click={edit_receipt(receipt)} style="padding: 0.25rem 0.75rem; background: #5568c0; border: 1.5px solid #5568c0; color: white; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; font-size: 0.875rem;">
                                 ✏️ Edit
                             </button>
-                            <button @click={delete_receipt(i)} onclick="return confirm('Delete this receipt?')" style="padding: 0.25rem 0.75rem; background: #c0202e; border: 1.5px solid #c0202e; color: white; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
+                            <button @click={delete_receipt(receipt.get('id', ''))} onclick="return confirm('Delete this receipt?')" style="padding: 0.25rem 0.75rem; background: #c0202e; border: 1.5px solid #c0202e; color: white; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
                                 🗑️ Delete
                             </button>
                         </td>
@@ -595,9 +590,9 @@ def isReceiptsEmpty():
 
 <!-- Modal Dialog -->
 <div class="modal-backdrop" style="display: {'flex' if show_modal else 'none'}; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center;" onmousedown="if(event.target===this)this.dataset.backdropDown='1';" onclick="if(event.target===this&&this.dataset.backdropDown){window._closeModal();}delete this.dataset.backdropDown;">
-    <div class="modal-card" style="background: var(--pico-card-background-color, white); padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border-radius: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.45); position: relative;">
+    <div class="modal-card" style="background: var(--pico-card-background-color, white); padding: 2rem 2rem 0 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border-radius: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.45); position: relative;">
         <button id="modal-close-x" @click={close_modal} style="display:none;"></button>
-        <button onclick="window._closeModal();" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #666; line-height: 1; padding: 0.25rem 0.5rem;">&times;</button>
+        <button onclick="window._closeModal();" style="position: absolute; top: 2rem; right: 2rem; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #666; line-height: 1; padding: 0.25rem 0.5rem;">&times;</button>
         <h2 style="margin-top: 0; color: var(--pico-color, inherit);">{edit_mode and 'Edit Receipt' or 'Add New Receipt'}</h2>
 
         <!-- Error Message Display -->
@@ -929,7 +924,7 @@ function exportCSV() {
     }
 
     const parsed = JSON.parse(data);
-    const receipts = parsed.receipts || [];
+    const receipts = Object.values(parsed.receipts || {});
 
     if (receipts.length === 0) {
         alert('No receipts to export');
@@ -962,7 +957,7 @@ function exportPDF() {
     }
 
     const parsed = JSON.parse(data);
-    const receipts = parsed.receipts || [];
+    const receipts = Object.values(parsed.receipts || {});
 
     if (receipts.length === 0) {
         alert('No receipts to export');
