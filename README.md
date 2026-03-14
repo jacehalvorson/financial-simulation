@@ -17,18 +17,20 @@ A financial simulation web application that visualizes historical stock market p
 # Install dependencies
 uv sync
 
-# Run development server (hot-reload, http://localhost:8000)
+# Run development server (hot-reload, http://localhost:3000)
 uv run pywire dev
 ```
 
 ### Docker
 
 ```bash
-# Build
-docker build -t financial-simulation .
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env and set a strong POSTGRES_PASSWORD
+source .env
 
-# Run (http://localhost:3000)
-docker run -p 3000:3000 financial-simulation
+# Start the app and database (http://localhost:3000)
+docker compose up --build
 ```
 
 ## Tech Stack
