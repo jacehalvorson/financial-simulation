@@ -1,6 +1,7 @@
 import os
 from pywire import PyWire
 from starlette.middleware.sessions import SessionMiddleware
+from auth_middleware import AuthMiddleware
 
 
 class _AppWithMiddleware:
@@ -24,10 +25,12 @@ _pywire = PyWire(
 
 app = _AppWithMiddleware(
     _pywire,
-    SessionMiddleware(
-        _pywire,
-        secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-in-production"),
-        https_only=False,
-        max_age=60 * 60 * 24 * 30,  # 30 days
+    AuthMiddleware(
+        SessionMiddleware(
+            _pywire,
+            secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-in-production"),
+            https_only=False,
+            max_age=60 * 60 * 24 * 30,  # 30 days
+        ),
     ),
 )

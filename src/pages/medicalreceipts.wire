@@ -5,6 +5,7 @@ import json
 import uuid
 from database import get_session
 from models import MedicalReceipt as _MedicalReceipt
+from context import current_user_id
 
 # ===== DB HELPERS =====
 
@@ -104,6 +105,7 @@ def open_add_modal():
     edit_mode.value = False
     form_error.value = ""
     show_modal.value = True
+    user_id = current_user_id.get()  # None = not logged in
 
 def close_modal():
     """Close modal"""
