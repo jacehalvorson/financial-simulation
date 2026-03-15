@@ -59,7 +59,7 @@ sort_column = wire("date")
 sort_direction = wire("desc")
 
 # Settings
-user_tax_bracket = wire(22.0)
+user_tax_bracket = wire(22)
 hsa_annual_return = wire(7.0)
 form_error = wire("")
 storage_json = wire(json.dumps({"version": "3.0", "receipts": receipts.value}))
@@ -107,6 +107,8 @@ def open_add_modal():
 
 def close_modal():
     """Close modal"""
+    if edit_mode.value:
+        reset_form()
     show_modal.value = False
     edit_mode.value = False
 

@@ -2,7 +2,7 @@
     <h1>Financial Simulation</h1>
     <p>Welcome to your personal financial planning dashboard. Choose a section below to get started.</p>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 3rem;">
         <a href="/globalmarket" style="
             text-decoration: none;
             color: inherit;
@@ -13,9 +13,9 @@
             transition: all 0.3s;
         " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 12px rgba(0,0,0,0.15)'"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)'">
-            <div style="color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">📈 Global Market</h2>
-                <p style="margin: 0; font-size: 0.95rem;">View historical stock market performance across 84 countries with inflation data.</p>
+            <div style="color: white;">
+                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.3rem; white-space: nowrap;">📈 Global Market</h2>
+                <p style="margin: 0; font-size: 0.95rem; color: rgb(180,210,240);">View historical stock market performance across 84 countries with inflation data.</p>
             </div>
         </a>
 
@@ -29,9 +29,9 @@
             transition: all 0.3s;
         " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 12px rgba(0,0,0,0.15)'"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)'">
-            <div style="color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">💰 Contributions</h2>
-                <p style="margin: 0; font-size: 0.95rem;">Track and manage your retirement account contributions and savings.</p>
+            <div style="color: white;">
+                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.3rem; white-space: nowrap;">💰 Contributions</h2>
+                <p style="margin: 0; font-size: 0.95rem; color: rgb(180,210,240);">Track and manage your retirement account contributions and savings.</p>
             </div>
         </a>
 
@@ -45,9 +45,9 @@
             transition: all 0.3s;
         " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 12px rgba(0,0,0,0.15)'"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)'">
-            <div style="color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">🏦 Withdrawals (COMING SOON)</h2>
-                <p style="margin: 0; font-size: 0.95rem;">Plan and track your retirement withdrawals and distribution strategy.</p>
+            <div style="color: white;">
+                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.3rem; white-space: nowrap;">🏦 Withdrawals</h2>
+                <p style="margin: 0; font-size: 0.95rem; color: rgb(180,210,240);">Plan and track your retirement withdrawals and distribution strategy.</p>
             </div>
         </a>
 
@@ -61,9 +61,9 @@
             transition: all 0.3s;
         " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 12px rgba(0,0,0,0.15)'"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)'">
-            <div style="color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">🏥 Medical Receipts (COMING SOON)</h2>
-                <p style="margin: 0; font-size: 0.95rem;">Store and organize your medical expenses and HSA-eligible receipts.</p>
+            <div style="color: white;">
+                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.3rem; white-space: nowrap;">🏥 Medical Receipts</h2>
+                <p style="margin: 0; font-size: 0.95rem; color: rgb(180,210,240);">Store and organize your medical expenses and HSA-eligible receipts.</p>
             </div>
         </a>
     </div>

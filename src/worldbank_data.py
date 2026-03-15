@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 
 
-def load_worldbank_stock_data(data_file='data/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
+def load_worldbank_stock_data(data_file='static/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
     """
     Load World Bank S&P Global Equity Indices data.
 
@@ -24,7 +24,7 @@ def load_worldbank_stock_data(data_file='data/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_1
     return df[year_cols]
 
 
-def get_country_stock_returns(country_name, years=20, data_file='data/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
+def get_country_stock_returns(country_name, years=20, data_file='static/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
     """
     Get stock market returns for a specific country.
 
@@ -74,7 +74,7 @@ def get_country_stock_returns(country_name, years=20, data_file='data/API_CM.MKT
     }
 
 
-def get_available_countries(data_file='data/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
+def get_available_countries(data_file='static/API_CM.MKT.INDX.ZG_DS2_en_csv_v2_10345.csv'):
     """
     Get list of countries that have stock market data.
 
