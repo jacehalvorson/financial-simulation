@@ -34,7 +34,7 @@ def close():
 @keyframes modal-card-in  { from { opacity:0; transform:translateY(40px) scale(0.95); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes modal-card-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-36px) scale(0.95); } }
 .modal-backdrop { animation: modal-overlay-in 0.28s ease forwards; -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
-.modal-backdrop.closing { animation: modal-overlay-out 0.18s ease forwards; }
+.modal-backdrop.closing { animation: modal-overlay-out 0.18s ease forwards; pointer-events: none; }
 .modal-card { animation: modal-card-in 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 .modal-card.closing { animation: modal-card-out 0.18s ease forwards; }
 </style>

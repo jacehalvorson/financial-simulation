@@ -104,16 +104,22 @@ update_filter_status = make_text_handler(filter_status)
 
 def open_add_modal():
     """Open modal in add mode — preserves any unsaved form values from a prior cancel"""
+    if not current_user_id.get():
+        return
     edit_mode.value = False
     form_error.value = ""
     show_modal.value = True
 
-def close_modal():
-    """Close modal"""
+def _cleanup_modal():
+    """Form cleanup only — called from JS bridge after the exit animation starts."""
     if edit_mode.value:
         reset_form()
-    show_modal.value = False
     edit_mode.value = False
+
+def close_modal():
+    """Full close including cleanup — called programmatically after saves."""
+    _cleanup_modal()
+    show_modal.value = False
 
 def reset_form():
     """Reset form fields to defaults — called only after a successful submit"""
@@ -132,6 +138,9 @@ def reset_form():
 
 def save_receipt():
     """Save new receipt to database"""
+    if not current_user_id.get():
+        form_error.value = "You must be logged in to save receipts."
+        return
     if not form_date.value or not form_provider.value:
         form_error.value = "Please fill in all required fields (Date and Provider)"
         return
@@ -184,6 +193,9 @@ def edit_receipt(receipt):
 
 def update_receipt():
     """Update existing receipt in database"""
+    if not current_user_id.get():
+        form_error.value = "You must be logged in to update receipts."
+        return
     if not form_date.value or not form_provider.value:
         form_error.value = "Please fill in all required fields (Date and Provider)"
         return
@@ -405,7 +417,7 @@ def isReceiptsEmpty():
 <input id="file-upload-data" @input={handle_file_upload} style="display:none" />
 
 <!-- localStorage persistence bridge -->
-<div id="storage-container" data-state={storage_json} style="display:none"></div>
+<div id="storage-container" data-state={storage_json} data-logged-in={'true' if current_user_id.get() else 'false'} style="display:none"></div>
 
 <div>
     <div style="margin-bottom: 2rem;">
@@ -451,15 +463,21 @@ def isReceiptsEmpty():
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 2rem;">
         <h2 style="margin: 0;">Receipt History</h2>
         <div style="display: flex; gap: 0.5rem;">
-            <button @click={open_add_modal} style="padding: 0.35rem 1rem; background: #5568c0; border: 1.5px solid #5568c0; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
-                ➕ Add Receipt
-            </button>
-            <button onclick="exportCSV()" style="padding: 0.35rem 1rem; background: #3d7a50; border: 1.5px solid #3d7a50; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
-                📊 Export to CSV
-            </button>
-            <button onclick="exportPDF()" style="padding: 0.35rem 1rem; background: #c0202e; border: 1.5px solid #c0202e; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
-                📄 Export to PDF
-            </button>
+            <span style="position: relative; display: inline-block;">
+                <button onclick="if(document.getElementById('storage-container').dataset.loggedIn!=='true'){window.showPopup(this.parentElement,'Log in to add receipts');}" @click={open_add_modal} style="padding: 0.35rem 1rem; background: #5568c0; border: 1.5px solid #5568c0; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
+                    ➕ Add Receipt
+                </button>
+            </span>
+            <span style="position: relative; display: inline-block;">
+                <button id="btn-export-csv" onclick="exportCSV()" style="padding: 0.35rem 1rem; background: #3d7a50; border: 1.5px solid #3d7a50; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
+                    📊 Export to CSV
+                </button>
+            </span>
+            <span style="position: relative; display: inline-block;">
+                <button id="btn-export-pdf" onclick="exportPDF()" style="padding: 0.35rem 1rem; background: #c0202e; border: 1.5px solid #c0202e; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
+                    📄 Export to PDF
+                </button>
+            </span>
         </div>
     </div>
 
@@ -520,9 +538,11 @@ def isReceiptsEmpty():
                 <div style="padding: 3rem; text-align: center; color: var(--pico-muted-color, #666); background: var(--pico-card-background-color, #fff);">
                     <p style="font-size: 1.2rem; margin-bottom: 1rem;">No receipts found</p>
                     <p style="margin-bottom: 1.5rem;">Get started by adding your first medical receipt</p>
-                    <button @click={open_add_modal} style="padding: 0.75rem 1.5rem; background: transparent; border: 1.5px solid #5568c0; color: #5568c0; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem;">
-                        ➕ Add Your First Receipt
-                    </button>
+                    <span style="position: relative; display: inline-block;">
+                        <button onclick="if(document.getElementById('storage-container').dataset.loggedIn!=='true'){window.showPopup(this.parentElement,'Log in to add receipts');}" @click={open_add_modal} style="padding: 0.75rem 1.5rem; background: transparent; border: 1.5px solid #5568c0; color: #5568c0; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 1rem;">
+                            ➕ Add Your First Receipt
+                        </button>
+                    </span>
                 </div>
             </div>
         </div>
@@ -554,6 +574,8 @@ def isReceiptsEmpty():
     .modal-backdrop.closing { animation: modal-overlay-out 0.18s ease forwards; pointer-events: none; }
     .modal-card { animation: modal-card-in 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards; }
     .modal-card.closing { animation: modal-card-out 0.18s ease forwards; }
+    @keyframes popup-in  { from { opacity:0; transform:translateX(-50%) translateY(-4px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    @keyframes popup-out { from { opacity:1; transform:translateX(-50%) translateY(0); } to { opacity:0; transform:translateX(-50%) translateY(4px); } }
 </style>
 
 <!-- Modal Dialog -->
@@ -741,7 +763,7 @@ def isReceiptsEmpty():
             e.target.dispatchEvent(ev);
         }
     }, true);
-});
+})();
 
 // ===== IMAGE COMPRESSION =====
 // Use event delegation since PyWire renders elements dynamically
@@ -841,7 +863,7 @@ async function compressImage(file, maxKB) {
 
 // ===== IMAGE PREVIEW =====
 
-function showImagePreview(thumbnail) {
+window.showImagePreview = function(thumbnail) {
     if (!thumbnail) return;
 
     const modal = document.createElement('div');
@@ -856,13 +878,39 @@ function showImagePreview(thumbnail) {
     document.body.appendChild(modal);
 }
 
+// ===== POPUP UTILITY =====
+
+window.showPopup = function(anchorEl, message, html) {
+    var existing = anchorEl.querySelector('.btn-popup');
+    if (existing) existing.remove();
+    var popup = document.createElement('div');
+    popup.className = 'btn-popup';
+    if (html instanceof Node) { popup.appendChild(html); } else if (html) { popup.innerHTML = html; } else { popup.textContent = message; }
+    popup.style.cssText = [
+        'position:absolute', 'top:calc(100% + 8px)', 'left:50%',
+        'transform:translateX(-50%)', 'background:#222', 'color:#fff',
+        'padding:0.4rem 0.75rem', 'border-radius:6px', 'font-size:0.82rem',
+        'white-space:nowrap', 'z-index:9999', 'pointer-events:none',
+        'box-shadow:0 2px 8px rgba(0,0,0,0.35)',
+        'animation:popup-in 0.15s ease forwards'
+    ].join(';');
+    anchorEl.appendChild(popup);
+    setTimeout(function () {
+        popup.style.animation = 'popup-out 0.15s ease forwards';
+        setTimeout(function () { popup.remove(); }, 150);
+    }, 2200);
+}
+
+
+
 // ===== CSV EXPORT =====
 
-function exportCSV() {
+window.exportCSV = function() {
     const container = document.getElementById('storage-container');
     const data = container && container.dataset.state;
+    const anchor = document.getElementById('btn-export-csv').parentElement;
     if (!data) {
-        alert('No receipts to export');
+        showPopup(anchor, 'No receipts to export');
         return;
     }
 
@@ -870,7 +918,7 @@ function exportCSV() {
     const receipts = Object.values(parsed.receipts || {});
 
     if (receipts.length === 0) {
-        alert('No receipts to export');
+        showPopup(anchor, 'No receipts to export');
         return;
     }
 
@@ -892,11 +940,12 @@ function exportCSV() {
 
 // ===== PDF EXPORT =====
 
-function exportPDF() {
+window.exportPDF = function() {
     const container = document.getElementById('storage-container');
     const data = container && container.dataset.state;
+    const anchor = document.getElementById('btn-export-pdf').parentElement;
     if (!data) {
-        alert('No receipts to export');
+        showPopup(anchor, 'No receipts to export');
         return;
     }
 
@@ -904,7 +953,7 @@ function exportPDF() {
     const receipts = Object.values(parsed.receipts || {});
 
     if (receipts.length === 0) {
-        alert('No receipts to export');
+        showPopup(anchor, 'No receipts to export');
         return;
     }
 
@@ -994,7 +1043,7 @@ function exportPDF() {
 
     window._closeModal = function () {
         var backdrop = document.querySelector('.modal-backdrop');
-        var card = document.querySelector('.modal-card');
+        var card = backdrop && backdrop.querySelector('.modal-card');
         if (backdrop) backdrop.classList.add('closing');
         if (card) card.classList.add('closing');
         setTimeout(function () {
