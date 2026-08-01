@@ -108,14 +108,32 @@ class TestLoginAgainstRealDatabase:
         assert "session=" in set_cookie
         assert "httponly" in set_cookie.lower()
 
-    def test_session_persists_identity_and_shows_in_nav(self, client, test_user):
+    def test_session_persists_across_navigation_and_refresh(self, client, test_user):
+        """A logged-in session must survive both navigating to other pages
+        and refreshing (repeating a GET on) the same page — regressions here
+        would mean users get silently logged out mid-session."""
         client.post(
             "/login",
             data={"email": test_user["email"], "password": test_user["password"]},
         )
-        resp = client.get("/")
-        assert test_user["email"] in resp.text
-        assert "Log out" in resp.text
+
+        # Navigating to other pages shouldn't drop the session.
+        for path in ["/", "/pricing", "/medicalreceipts", "/login"]:
+            resp = client.get(path)
+            assert resp.status_code == 200
+            if path == "/login":
+                assert "already logged in" in resp.text
+            elif path == "/medicalreceipts":
+                assert 'data-logged-in="true"' in resp.text
+            else:
+                assert test_user["email"] in resp.text
+                assert "Log out" in resp.text
+
+        # Refreshing (repeating a GET on) the same page shouldn't either.
+        for _ in range(3):
+            resp = client.get("/")
+            assert test_user["email"] in resp.text
+            assert "Log out" in resp.text
 
     def test_logout_clears_the_session(self, client, test_user):
         client.post(

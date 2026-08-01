@@ -8,7 +8,8 @@
 - `/medicalreceipts` correctly shows its anonymous (`data-logged-in="false"`) state, confirming the auth gate added in `medicalreceipts.wire` actually reads the real session.
 - `POST /logout` is a safe no-op (redirects to `/login`) when there's no session to clear.
 - `POST /login` reports the graceful `no_db` error when `DATABASE_URL` isn't configured, instead of raising.
-- (DB-gated, see below) A correct email/password sets a `Set-Cookie` with `HttpOnly`, a wrong password is rejected without setting a cookie, the logged-in identity shows up in the nav (`__layout__.wire`), and logout clears the session.
+- (DB-gated, see below) A correct email/password sets a `Set-Cookie` with `HttpOnly`, a wrong password is rejected without setting a cookie, and logout clears the session.
+- (DB-gated) The session survives both **navigating** to other pages (`/`, `/pricing`, `/medicalreceipts`, `/login`) and **refreshing** (repeating a GET on) the same page, staying logged in throughout rather than only on the one request right after login — `test_session_persists_across_navigation_and_refresh`. Verified as a real regression test, not just a passing assertion: temporarily breaking `AuthMiddleware`'s session-read logic makes this test fail with a clear diff, confirming it actually catches the failure mode it's named for.
 
 ## What's real vs. stubbed
 
