@@ -1,11 +1,7 @@
-import os
-
 from context import current_user_id
 from login_middleware import LoginFormMiddleware
+from session_config import SECRET_KEY, SESSION_MAX_AGE
 from starlette.middleware.sessions import SessionMiddleware
-
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
-SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days, must match auth_middleware_stack()
 
 
 class AuthMiddleware:

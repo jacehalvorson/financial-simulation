@@ -8,3 +8,4 @@ __pycache__/
 localhost.pem
 localhost-key.pem
 .pywire/
+.pytest_cache/

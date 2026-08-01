@@ -5,6 +5,25 @@ from starlette.responses import RedirectResponse
 from database import get_session
 from models import User
 from password_utils import verify_password
+from session_config import SESSION_MAX_AGE
+
+# Non-secret, non-httponly marker cookie set alongside "session".
+#
+# Works around a pywire bug: the interactive WebSocket client reconciles its
+# per-connection cookie jar against `document.cookie` on every SPA navigation
+# (see pywire/runtime/websocket.py `_reconcile_from_client_cookies`). Because
+# our real session cookie is httponly, `document.cookie` is *completely
+# empty* when "session" is the only cookie the app sets. pywire's reconcile
+# logic explicitly refuses to infer "httponly" from an empty client payload —
+# it can't tell "one hidden cookie" from "no cookies at all" — so it falls
+# through to its tombstone path and treats the invisible session cookie as
+# deleted. Every SPA navigation after that silently logs the user out on that
+# WebSocket connection (the real browser cookie is untouched; a fresh
+# connection reads it fine — it's specifically pywire's virtual jar that gets
+# corrupted). Setting one harmless, JS-visible cookie alongside "session"
+# makes `document.cookie` non-empty, so pywire correctly infers "session" is
+# present-but-hidden instead of absent, and never tombstones it.
+HAS_SESSION_COOKIE = "has_session"
 
 
 class LoginFormMiddleware:
@@ -54,6 +73,15 @@ class LoginFormMiddleware:
 
         destination = "/" if error is None else f"/login?error={error}"
         response = RedirectResponse(destination, status_code=303)
+        if error is None:
+            response.set_cookie(
+                HAS_SESSION_COOKIE,
+                "1",
+                max_age=SESSION_MAX_AGE,
+                path="/",
+                httponly=False,
+                samesite="lax",
+            )
         await response(scope, receive, send)
 
     async def _logout(self, scope, receive, send) -> None:
@@ -61,4 +89,5 @@ class LoginFormMiddleware:
         if session:
             session.clear()
         response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(HAS_SESSION_COOKIE, path="/")
         await response(scope, receive, send)

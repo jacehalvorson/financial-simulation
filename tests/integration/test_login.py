@@ -1,21 +1,19 @@
 """End-to-end coverage of the login/logout flow (see src/login_middleware.py).
 
-Runs against the in-process TestClient — no docker, no dev server needed.
-The DB-backed happy path is gated behind DATABASE_URL: it creates a
-throwaway bcrypt-hashed user, exercises real login, then deletes it. Without
-DATABASE_URL, only the paths that don't require a real user are exercised
-(anonymous state, the "no_db" graceful-failure branch, logout safety) — see
-tests/db/test_models.py for why a real Postgres can't be swapped for sqlite.
+Runs against the in-process TestClient — no live dev server needed. The
+DB-backed happy path (`TestLoginAgainstRealDatabase`) uses the `postgres_url`
+fixture from tests/conftest.py, which auto-provisions a disposable Postgres
+via testcontainers if Docker is available (or reuses DATABASE_URL if you've
+already set one) — no manual setup required either way. It creates a
+throwaway bcrypt-hashed user, exercises real login, then deletes it. See
+tests/db/README.md for why a real Postgres can't be swapped for sqlite.
 """
 
-import os
 import uuid
 
 import pytest
 
 pytestmark = pytest.mark.integration
-
-HAS_DB = bool(os.environ.get("DATABASE_URL"))
 
 
 def test_login_page_shows_form_when_anonymous(client):
@@ -37,8 +35,16 @@ def test_logout_is_a_no_op_when_not_logged_in(client):
     assert resp.headers["location"] == "/login"
 
 
-@pytest.mark.skipif(HAS_DB, reason="only exercises the no-DATABASE_URL fallback path")
-def test_login_post_reports_no_db_when_unconfigured(client):
+def test_login_post_reports_no_db_when_unconfigured(client, monkeypatch):
+    """Forces the not-configured state explicitly (rather than relying on
+    DATABASE_URL being ambiently unset) so this test's outcome doesn't depend
+    on whether a DB-backed test happened to run earlier in the same session
+    and auto-provisioned one — see postgres_url in tests/conftest.py."""
+    import database
+
+    monkeypatch.setattr(database, "engine", None)
+    monkeypatch.setattr(database, "SessionLocal", None)
+
     resp = client.post(
         "/login",
         data={"email": "nobody@example.com", "password": "irrelevant"},
@@ -49,16 +55,16 @@ def test_login_post_reports_no_db_when_unconfigured(client):
 
 
 @pytest.mark.db
-@pytest.mark.skipif(not HAS_DB, reason="needs a real DATABASE_URL — see tests/db/test_models.py")
 class TestLoginAgainstRealDatabase:
     """Exercises the bcrypt-verified path against a real Postgres.
 
     Creates and tears down its own disposable user so it never depends on
-    (or pollutes) whatever else lives in the database.
+    (or pollutes) whatever else lives in the database. Auto-provisioned via
+    the `db_session_factory` fixture — no manual DATABASE_URL setup needed.
     """
 
     @pytest.fixture
-    def test_user(self):
+    def test_user(self, db_session_factory):
         from database import get_session
         from models import User
         from password_utils import hash_password
