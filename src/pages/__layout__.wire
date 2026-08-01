@@ -34,11 +34,35 @@ def current_user_email():
                 <li><a href="/">Home</a></li>
                 <li><a href="/pricing">Pricing</a></li>
                 {$if current_user_id.get()}
-                    <li class="nav-user">{current_user_email() or current_user_id.get()}</li>
+                    <!--
+                        Plain div+button toggle, no PyWire reactivity and no
+                        <details>. __layout__.wire gets a brand-new component
+                        instance on every page render (it wraps each page
+                        fresh), so a wire() cell here can't hold open/closed
+                        state across a click -> re-render cycle the way it
+                        does on a normal page. <details> was tried first, but
+                        (a) Pico CSS unconditionally adds its own accordion
+                        chevron via `summary::after` regardless of the native
+                        marker being suppressed, and (b) native <details>
+                        content can't be smoothly transitioned — the browser
+                        shows/hides it outside the CSS animation pipeline. A
+                        plain class toggle avoids both.
+                    -->
                     <li>
-                        <form method="POST" action="/logout" class="nav-logout-form">
-                            <button type="submit" class="nav-logout-btn">Log out</button>
-                        </form>
+                        <div class="nav-user-menu">
+                            <button type="button" class="nav-user-icon" aria-label="Account menu" aria-haspopup="true" aria-expanded="false"
+                                    onclick="this.parentElement.classList.toggle('open'); this.setAttribute('aria-expanded', this.parentElement.classList.contains('open'));">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.5c-3.4 0-9.9 1.7-9.9 5v2.3h19.8v-2.3c0-3.3-6.5-5-9.9-5z"/>
+                                </svg>
+                            </button>
+                            <div class="nav-user-popup">
+                                <div class="nav-user-email">{current_user_email() or current_user_id.get()}</div>
+                                <form method="POST" action="/logout" class="nav-logout-form">
+                                    <button type="submit" class="nav-logout-btn">Log out</button>
+                                </form>
+                            </div>
+                        </div>
                     </li>
                 {$else}
                     <li><a href="/login">Login</a></li>
@@ -49,13 +73,79 @@ def current_user_email():
     <main class="container">
         {$render children}
     </main>
+
+    <script>
+    (() => {
+        if (window.__navUserMenuOutsideClickBound) return;
+        window.__navUserMenuOutsideClickBound = true;
+        document.addEventListener('click', (e) => {
+            document.querySelectorAll('.nav-user-menu.open').forEach((menu) => {
+                if (menu.contains(e.target)) return;
+                menu.classList.remove('open');
+                const btn = menu.querySelector('.nav-user-icon');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+        }, true);
+    })();
+    </script>
 </body>
 </html>
 
 <style scoped>
-.nav-user {
-    color: var(--pico-muted-color, #666);
+.nav-user-menu {
+    position: relative;
+}
+
+.nav-user-icon {
+    width: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem;
+    border-radius: 50%;
+    background: transparent;
+    border: 1.5px solid #8a8f98;
+    color: #495057;
+    cursor: pointer;
+    line-height: 0;
+}
+
+.nav-user-icon:hover {
+    background: #f0f1f3;
+}
+
+.nav-user-popup {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    z-index: 100;
+    min-width: 220px;
+    max-width: 320px;
+    background: #ffffff;
+    border: 1px solid #d8dade;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transform-origin: top right;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.nav-user-menu.open .nav-user-popup {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.nav-user-email {
+    color: #212529;
     font-size: 0.9rem;
+    word-break: break-all;
 }
 
 .nav-logout-form {
@@ -63,11 +153,19 @@ def current_user_email():
 }
 
 .nav-logout-btn {
-    width: auto;
-    padding: 0.35rem 0.75rem;
+    width: 100%;
+    padding: 0.45rem 0.75rem;
     font-size: 0.85rem;
-    background: transparent;
-    border: 1.5px solid var(--pico-muted-border-color, #ccc);
-    color: var(--pico-color, #222);
+    font-weight: 500;
+    background: #b82040;
+    border: 1.5px solid #b82040;
+    color: #ffffff;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.nav-logout-btn:hover {
+    background: #9c1a36;
+    border-color: #9c1a36;
 }
 </style>
