@@ -1,3 +1,20 @@
+---
+from context import current_user_id
+from database import get_session
+from models import User
+
+
+def current_user_email():
+    uid = current_user_id.get()
+    if not uid:
+        return None
+    try:
+        with get_session() as db_session:
+            user = db_session.get(User, uid)
+            return user.email if user else None
+    except RuntimeError:
+        return None
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,7 +33,16 @@
             <ul>
                 <li><a href="/">Home</a></li>
                 <li><a href="/pricing">Pricing</a></li>
-                <li><a href="/login">Login</a></li>
+                {$if current_user_id.get()}
+                    <li class="nav-user">{current_user_email() or current_user_id.get()}</li>
+                    <li>
+                        <form method="POST" action="/logout" class="nav-logout-form">
+                            <button type="submit" class="nav-logout-btn">Log out</button>
+                        </form>
+                    </li>
+                {$else}
+                    <li><a href="/login">Login</a></li>
+                {/if}
             </ul>
         </nav>
     </header>
@@ -25,3 +51,23 @@
     </main>
 </body>
 </html>
+
+<style scoped>
+.nav-user {
+    color: var(--pico-muted-color, #666);
+    font-size: 0.9rem;
+}
+
+.nav-logout-form {
+    margin: 0;
+}
+
+.nav-logout-btn {
+    width: auto;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    background: transparent;
+    border: 1.5px solid var(--pico-muted-border-color, #ccc);
+    color: var(--pico-color, #222);
+}
+</style>

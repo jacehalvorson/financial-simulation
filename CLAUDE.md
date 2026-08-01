@@ -21,6 +21,17 @@ uv run pywire dev
 
 The Docker image uses `pywire dev --no-tui --host 0.0.0.0 --reload` over plain HTTP. **Do not add mkcert to the Dockerfile** — the container-generated cert won't be trusted by the host browser.
 
+### Testing
+
+```bash
+uv run pytest                              # everything
+uv run pytest tests/integration            # one category
+uv run pytest -m db                        # by marker (db, web, docker, integration)
+uv run pytest --durations=0                # per-test timing
+```
+
+No live server needed — `tests/conftest.py`'s `client` fixture drives the `PyWire` ASGI app in-process via `starlette.testclient.TestClient`. `tests/integration/test_login.py` is the reference example: plain-HTTP routes (`/login`, `/logout` — see Auth above) are just `client.post(...)`/`client.get(...)`, no WebSocket protocol needed. Its DB-backed class (`TestLoginAgainstRealDatabase`) is gated on `DATABASE_URL` being set — point it at a real Postgres with the schema migrated (`alembic upgrade head`) to run those; otherwise they skip cleanly. A future WebSocket-driven test (for `@click`-heavy pages like contributions/withdrawals/medicalreceipts) would need a helper that speaks PyWire's msgpack event protocol directly via `client.websocket_connect("/_pywire/ws")` — not needed yet, since nothing currently under test uses it. `db`/`web`/`docker` categories are still skeletons pending real fixtures — see each module's docstring.
+
 ## Architecture
 
 ### PyWire Framework
@@ -82,6 +93,18 @@ Single `---` line opens and closes frontmatter. **No `--- html ---` separator** 
 `AuthMiddleware` reads `scope["session"]["user_id"]` and writes to the `current_user_id` ContextVar (see [src/context.py](src/context.py)) so `.wire` pages can `from context import current_user_id`.
 
 Alternative (not used here): `pywire_auth.connect_auth(app, ...)` auto-installs PyWire's own `SessionMiddleware` + `AuthMiddleware` + routes + policy engine. Use it if/when migrating off the DIY stack.
+
+**Default state is unauthenticated.** `current_user_id.get()` returns `None` until a session cookie says otherwise — there is no dev-user fallback.
+
+**Login/logout are plain HTML form POSTs, not PyWire events — this is deliberate.** [src/login_middleware.py](src/login_middleware.py)'s `LoginFormMiddleware` sits between `SessionMiddleware` and `AuthMiddleware` in the stack and intercepts `POST /login` / `POST /logout` directly, ahead of PyWire's own page router. [src/pages/login.wire](src/pages/login.wire) posts to these with a bare `<form method="POST" action="/login">` — no `@submit`.
+
+**Why not a `@click`/`@submit` handler**: those run inside the page's long-lived interactive WebSocket connection, which never sends an `http.response.start` — the one message `SessionMiddleware` hooks to attach a real, `httponly` `Set-Cookie`. A plain unbound `<form>` submits as a genuine top-level browser POST instead, so `LoginFormMiddleware` can write `scope["session"]["user_id"]` directly and let `SessionMiddleware` sign and set the cookie itself, the same way it would for any ordinary route. (Confirmed against the compiled client bundle: PyWire's delegated listener only calls `preventDefault`/hijacks an event when the target has a matching `data-on-<event>` attribute, which only `@click`/`@submit`/etc. add — an unbound element is never intercepted.)
+
+`LoginFormMiddleware` verifies credentials against `models.User.password_hash` via [src/password_utils.py](src/password_utils.py) (`bcrypt`), then redirects: `/` on success (cookie set), `/login?error=invalid` on bad credentials, `/login?error=no_db` if `DATABASE_URL` isn't configured (e.g. local `pywire dev` without Docker).
+
+**`current_user_id` is a `ContextVar`, not a `wire()` cell.** This is a non-issue for the login/logout flow itself (a redirect always triggers a fresh full-page render, so `__layout__.wire`'s nav and every page re-read the ContextVar from scratch). It only matters if you add a page that needs to react to auth state *without* a navigation/reload — that page must seed a real `wire()` cell from `current_user_id.get()` on load and keep it in sync manually, since PyWire's reactivity graph can't see ContextVar mutations.
+
+**Compiler quirk observed on pywire 0.11.4**: a bare `{plain_func}` interpolation (no explicit `wire`/`derived` involved) rendered the method object itself instead of calling it, in at least one case. If a plain-def interpolation doesn't seem to update, use the explicit `{plain_func()}` form — both are documented as equivalent, but only the explicit form reliably worked here.
 
 ### Data Layer
 

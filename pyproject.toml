@@ -19,5 +19,17 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
     "pywire[cli]",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: exercises the running PyWire app end-to-end via TestClient",
+    "db: database/model layer tests (src/models.py, src/database.py)",
+    "web: styling/template consistency tests",
+    "docker: Docker/Compose configuration tests",
 ]

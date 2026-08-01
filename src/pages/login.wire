@@ -1,110 +1,49 @@
 ---
-from pywire import wire, derived
-from auth_middleware import sign_session
 from context import current_user_id
-
-# Step 1 of auth: hardcoded demo identities, no database involved yet.
-# Swap this out for a real users table + password check once ready.
-DEMO_USERS = [
-    {"id": "user-alice", "name": "Alice Anderson", "initial": "A", "gradient": "#4e62c8, #8030b8"},
-    {"id": "user-bob", "name": "Bob Brennan", "initial": "B", "gradient": "#c038a8, #b82040"},
-    {"id": "user-carol", "name": "Carol Chen", "initial": "C", "gradient": "#28a860, #108898"},
-]
-
-# Seeded from the ContextVar so a fresh page load/navigation reflects whatever
-# AuthMiddleware already resolved from the session cookie for this connection.
-logged_in_user_id = wire(current_user_id.get())
-
-
-@derived
-def logged_in_user():
-    uid = logged_in_user_id.value
-    return next((u for u in DEMO_USERS if u["id"] == uid), None)
-
-
-def _login(user_id: str):
-    current_user_id.set(user_id)
-    logged_in_user_id.value = user_id
-    set_cookie(
-        "session",
-        sign_session({"user_id": user_id}),
-        max_age=60 * 60 * 24 * 30,
-        samesite="lax",
-    )
-
-
-def login_as_alice(event):
-    _login("user-alice")
-
-
-def login_as_bob(event):
-    _login("user-bob")
-
-
-def login_as_carol(event):
-    _login("user-carol")
-
-
-def logout(event):
-    current_user_id.set(None)
-    logged_in_user_id.value = None
-    delete_cookie("session")
-
-
-def raw_context_value():
-    return current_user_id.get() or "None"
 ---
 <section class="login-page">
     <h1>Login</h1>
 
-    {$if logged_in_user.value}
+    {$if current_user_id.get()}
         <div class="status-banner status-in">
-            <div class="status-avatar" style="background: linear-gradient(135deg, {logged_in_user.value['gradient']});">
-                {logged_in_user.value['initial']}
-            </div>
             <div>
-                <strong>Logged in as {logged_in_user.value['name']}</strong>
-                <div class="status-sub">user id: <code>{logged_in_user.value['id']}</code></div>
+                <strong>You're already logged in</strong>
+                <div class="status-sub">user id: <code>{current_user_id.get()}</code></div>
             </div>
-            <button class="logout-btn" @click={logout}>Log out</button>
+            <form method="POST" action="/logout" class="logout-form">
+                <button class="logout-btn" type="submit">Log out</button>
+            </form>
         </div>
     {$else}
-        <div class="status-banner status-out">
-            <div class="status-avatar status-avatar-empty">?</div>
-            <div>
-                <strong>Not logged in</strong>
-                <div class="status-sub">Pick a demo user below to sign in</div>
-            </div>
-        </div>
+        {$if query.get('error') == 'invalid'}
+            <p class="form-error">Incorrect email or password.</p>
+        {/if}
+        {$if query.get('error') == 'no_db'}
+            <p class="form-error">Database is not configured (DATABASE_URL missing) — cannot log in right now.</p>
+        {/if}
+
+        <!--
+            Plain HTML form, no @submit binding. PyWire's client only
+            intercepts events on elements carrying a data-on-<event>
+            attribute (which @submit would add) — an unbound <form> submits
+            natively, giving SessionMiddleware a real HTTP response to
+            attach an httponly Set-Cookie to. See login_middleware.py.
+        -->
+        <form method="POST" action="/login" class="login-form">
+            <label>Email
+                <input type="email" name="email" required autocomplete="username" autofocus>
+            </label>
+            <label>Password
+                <input type="password" name="password" required autocomplete="current-password">
+            </label>
+            <button type="submit">Log in</button>
+        </form>
     {/if}
-
-    <p class="section-label">Demo users (no database yet — for testing session state only)</p>
-
-    <div class="user-grid">
-        <button class="user-card" data-active={'true' if logged_in_user_id.value == 'user-alice' else 'false'} @click={login_as_alice}>
-            <div class="user-avatar" style="background: linear-gradient(135deg, #4e62c8, #8030b8);">A</div>
-            <span>Alice Anderson</span>
-        </button>
-        <button class="user-card" data-active={'true' if logged_in_user_id.value == 'user-bob' else 'false'} @click={login_as_bob}>
-            <div class="user-avatar" style="background: linear-gradient(135deg, #c038a8, #b82040);">B</div>
-            <span>Bob Brennan</span>
-        </button>
-        <button class="user-card" data-active={'true' if logged_in_user_id.value == 'user-carol' else 'false'} @click={login_as_carol}>
-            <div class="user-avatar" style="background: linear-gradient(135deg, #28a860, #108898);">C</div>
-            <span>Carol Chen</span>
-        </button>
-    </div>
-
-    <details class="debug-panel">
-        <summary>Debug: raw session state</summary>
-        <p><code>context.current_user_id.get()</code> &rarr; <code>{raw_context_value()}</code></p>
-        <p><code>logged_in_user_id.value</code> (this page's wire cell) &rarr; <code>{logged_in_user_id.value or 'None'}</code></p>
-    </details>
 </section>
 
 <style scoped>
 .login-page {
-    max-width: 640px;
+    max-width: 420px;
     margin: 0 auto;
 }
 
@@ -115,35 +54,8 @@ def raw_context_value():
     padding: 1rem 1.25rem;
     border-radius: 8px;
     margin-bottom: 1.5rem;
-    border: 1.5px solid transparent;
-}
-
-.status-in {
+    border: 1.5px solid #28a860;
     background: var(--pico-card-background-color, #f4fbf6);
-    border-color: #28a860;
-}
-
-.status-out {
-    background: var(--pico-card-background-color, #f7f7f8);
-    border-color: var(--pico-muted-border-color, #ddd);
-}
-
-.status-avatar {
-    flex-shrink: 0;
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 1.1rem;
-}
-
-.status-avatar-empty {
-    background: var(--pico-muted-border-color, #ccc);
-    color: var(--pico-muted-color, #666);
 }
 
 .status-sub {
@@ -152,8 +64,11 @@ def raw_context_value():
     margin-top: 0.15rem;
 }
 
-.logout-btn {
+.logout-form {
     margin-left: auto;
+}
+
+.logout-btn {
     width: auto;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
@@ -162,66 +77,18 @@ def raw_context_value():
     color: #b82040;
 }
 
-.section-label {
-    color: var(--pico-muted-color, #666);
-    font-size: 0.875rem;
-    margin-bottom: 0.75rem;
+.form-error {
+    background: #fdecee;
+    border: 1.5px solid #b82040;
+    color: #b82040;
+    padding: 0.6rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
 }
 
-.user-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.user-card {
+.login-form {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 1.25rem 1rem;
-    background: var(--pico-card-background-color, #fff);
-    border: 1.5px solid var(--pico-muted-border-color, #ddd);
-    border-radius: 8px;
-    cursor: pointer;
-    color: var(--pico-color, #222);
-    font-weight: 500;
-    transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.user-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--pico-primary, #5568c0);
-}
-
-.user-card[data-active="true"] {
-    border-color: #28a860;
-    box-shadow: 0 0 0 1.5px #28a860;
-}
-
-.user-avatar {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 1.2rem;
-}
-
-.debug-panel {
-    background: var(--pico-card-background-color, #f7f7f8);
-    border: 1px dashed var(--pico-muted-border-color, #ccc);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-}
-
-.debug-panel summary {
-    cursor: pointer;
-    color: var(--pico-muted-color, #666);
+    gap: 1rem;
 }
 </style>

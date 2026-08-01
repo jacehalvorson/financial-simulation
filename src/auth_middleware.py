@@ -1,9 +1,7 @@
-import json
 import os
-from base64 import b64encode
 
-import itsdangerous
 from context import current_user_id
+from login_middleware import LoginFormMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
@@ -26,30 +24,13 @@ class AuthMiddleware:
             current_user_id.reset(token)
 
 
-def sign_session(data: dict) -> str:
-    """Sign a session payload in the exact format Starlette's SessionMiddleware
-    expects to read back from the "session" cookie.
-
-    Login happens inside a PyWire interactive event handler, which runs over
-    the page's persistent WebSocket connection rather than a fresh HTTP
-    request/response cycle. SessionMiddleware only ever attaches its
-    Set-Cookie header to an ``http.response.start`` message, which never
-    occurs on that connection — so it cannot save our login itself. We sign
-    the cookie value by hand (same secret, same itsdangerous scheme) and push
-    it to the browser via ``page.set_cookie()``, PyWire's transport-agnostic
-    cookie primitive. On the next page load/reconnect, SessionMiddleware reads
-    this cookie normally and AuthMiddleware picks up the user id from it.
-    """
-    signer = itsdangerous.TimestampSigner(SECRET_KEY)
-    payload = b64encode(json.dumps(data).encode("utf-8"))
-    return signer.sign(payload).decode("utf-8")
-
-
 def auth_middleware_stack():
     """Return the middleware list to pass to PyWire(middleware=...).
 
-    Order: outermost first. SessionMiddleware must wrap AuthMiddleware so
-    scope['session'] is populated before AuthMiddleware reads it.
+    Order: outermost first. SessionMiddleware must wrap LoginFormMiddleware
+    so scope['session'] is a real Starlette Session the login/logout POST
+    handlers can write to. AuthMiddleware runs innermost, reading whatever
+    SessionMiddleware decoded from the cookie on this request.
     """
     return [
         (
@@ -60,5 +41,6 @@ def auth_middleware_stack():
                 "max_age": SESSION_MAX_AGE,
             },
         ),
+        LoginFormMiddleware,
         AuthMiddleware,
     ]
